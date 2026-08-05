@@ -1,8 +1,16 @@
 """ORM-моделі бази даних."""
 
+from .calc import (
+    CalcCalculation,
+    CalcItem,
+    CalcMaterial,
+    CalcSetting,
+    OverheadItem,
+    SubtypeMaterial,
+)
 from .calculation import Calculation
 from .employee import Employee
-from .product import Product, ProductSubtype, ProductType, SizeRange
+from .product import ProductSubtype, ProductType, SizeRange
 from .project import Project, ProjectComponent, ProjectMaterial, ProjectWork
 
 __all__ = [
@@ -12,8 +20,13 @@ __all__ = [
     "ProjectWork",
     "Calculation",
     "Employee",
-    "Product",
     "ProductType",
     "ProductSubtype",
     "SizeRange",
+    "CalcMaterial",
+    "SubtypeMaterial",
+    "CalcCalculation",
+    "CalcItem",
+    "OverheadItem",
+    "CalcSetting",
 ]

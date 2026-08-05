@@ -1,78 +1,46 @@
-"""
-Репозиторій для роботи з налаштуваннями калькулятора
-"""
+"""ORM-репозиторій для роботи з налаштуваннями."""
 
-from typing import Any
+from sqlalchemy.orm import Session
 
-from ventilation_company.database import get_calc_db
+from ventilation_company.database.models.calc import CalcSetting
 
 
-class SettingsRepo:
-    """CRUD для calc_settings"""
+class SettingsRepository:
+    """CRUD для calc_settings через ORM."""
 
-    @staticmethod
-    def get(key: str, default: str = "") -> str:
-        db = get_calc_db()
-        row = db.execute("SELECT value FROM calc_settings WHERE key=?", (key,)).fetchone()
-        db.close()
-        return row["value"] if row else default
+    def __init__(self, db: Session):
+        self.db = db
 
-    @staticmethod
-    def get_float(key: str, default: float = 0.0) -> float:
-        val = SettingsRepo.get(key)
-        try:
-            return float(val) if val else default
-        except ValueError:
-            return default
+    def get_all(self) -> list[CalcSetting]:
+        return self.db.query(CalcSetting).all()
 
-    @staticmethod
-    def get_int(key: str, default: int = 0) -> int:
-        val = SettingsRepo.get(key)
-        try:
-            return int(val) if val else default
-        except ValueError:
-            return default
+    def get_value(self, key: str, default: str | None = None) -> str:
+        setting = self.db.query(CalcSetting).filter(CalcSetting.key == key).first()
+        return setting.value if setting else default
 
-    @staticmethod
-    def set(key: str, value: Any) -> None:
-        db = get_calc_db()
-        db.execute(
-            """INSERT INTO calc_settings (key, value)
-               VALUES (?, ?)
-               ON CONFLICT(key) DO UPDATE SET value=excluded.value""",
-            (key, str(value)),
-        )
-        db.commit()
-        db.close()
+    def get_int(self, key: str, default: int = 0) -> int:
+        val = self.get_value(key)
+        return int(val) if val is not None else default
 
-    @staticmethod
-    def get_all() -> dict[str, str]:
-        db = get_calc_db()
-        rows = db.execute("SELECT key, value FROM calc_settings").fetchall()
-        db.close()
-        return {r["key"]: r["value"] for r in rows}
+    def get_float(self, key: str, default: float = 0.0) -> float:
+        val = self.get_value(key)
+        return float(val) if val is not None else default
 
-    @staticmethod
-    def delete(key: str) -> None:
-        db = get_calc_db()
-        db.execute("DELETE FROM calc_settings WHERE key=?", (key,))
-        db.commit()
-        db.close()
+    def set_value(self, key: str, value: str) -> CalcSetting:
+        setting = self.db.query(CalcSetting).filter(CalcSetting.key == key).first()
+        if setting:
+            setting.value = value
+        else:
+            setting = CalcSetting(key=key, value=value)
+            self.db.add(setting)
+        self.db.commit()
+        self.db.refresh(setting)
+        return setting
 
-    @staticmethod
-    def get_dict(key: str, default: dict = None) -> dict:
-        import json
-
-        val = SettingsRepo.get(key)
-        if val:
-            try:
-                return json.loads(val)
-            except Exception:
-                pass
-        return default or {}
-
-    @staticmethod
-    def set_dict(key: str, value: dict) -> None:
-        import json
-
-        SettingsRepo.set(key, json.dumps(value))
+    def delete(self, key: str) -> bool:
+        setting = self.db.query(CalcSetting).filter(CalcSetting.key == key).first()
+        if not setting:
+            return False
+        self.db.delete(setting)
+        self.db.commit()
+        return True
