@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Вкладка \"Матеріали\"."""
 
 import tkinter as tk
 from tkinter import ttk
 
-from .base_tab import BaseTab
 from ventilation_company.config import MATERIALS
+
+from .base_tab import BaseTab
 
 
 class MaterialsTab(BaseTab):
     def setup_ui(self):
         c = self.colors
-        tk.Label(self, text="КАТАЛОГ МАТЕРІАЛІВ", bg=c["bg"], fg=c["fg"],
-                 font=("Arial", 18, "bold")).pack(pady=15)
+        tk.Label(
+            self, text="КАТАЛОГ МАТЕРІАЛІВ", bg=c["bg"], fg=c["fg"], font=("Arial", 18, "bold")
+        ).pack(pady=15)
 
         columns = ("Назва", "Ціна за м²", "Одиниця")
         tree = ttk.Treeview(self, columns=columns, show="headings", height=20)

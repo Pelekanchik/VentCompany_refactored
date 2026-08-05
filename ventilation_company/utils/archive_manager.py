@@ -1,10 +1,12 @@
 """
 Менеджер архівів
 """
+
 import os
-import zipfile
 import shutil
+import zipfile
 from datetime import datetime
+
 from ventilation_company.config import ARCHIVE_DIR
 
 
@@ -41,7 +43,7 @@ class ArchiveManager:
                     arcname = os.path.basename(file_path)
                     zf.write(file_path, arcname)
                     print(f"  DODANO: {arcname}")
-        print(f"Fajly dodano do arkhivu")
+        print("Fajly dodano do arkhivu")
         return archive_path
 
     def extract_archive(self, archive_path, extract_to=None):

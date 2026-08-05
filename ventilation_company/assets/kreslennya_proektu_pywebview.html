@@ -1836,7 +1836,7 @@ function draw() {
   document.getElementById('zoom-in').addEventListener('click', function() { scale = Math.min(20, scale * 1.5); draw(); });
   document.getElementById('zoom-out').addEventListener('click', function() { scale = Math.max(0.01, scale / 1.5); draw(); });
   document.getElementById('zoom-reset').addEventListener('click', function() { scale = 1; offsetX = 0; offsetY = 0; draw(); });
-document.getElementById('zoom-fit').addEventListener('click', function() { 
+document.getElementById('zoom-fit').addEventListener('click', function() {
     // Автоматичне масштабування, щоб вмістити все креслення
     var bounds = getDrawingBounds();
     if (bounds) {
@@ -1950,7 +1950,7 @@ document.getElementById('zoom-fit').addEventListener('click', function() {
     initPyWebView();
     setTimeout(function() { initPyWebView(); }, 500);
     resize(); draw();
-  
+
 })();
 </script>
 </body>

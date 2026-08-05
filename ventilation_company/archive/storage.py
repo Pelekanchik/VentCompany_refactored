@@ -1,8 +1,10 @@
 """
 Модуль зберігання та архівування
 """
+
 import os
 from datetime import datetime
+
 from ventilation_company.config import ARCHIVE_DIR, PROJECTS_DIR
 from ventilation_company.database import execute_query
 from ventilation_company.utils.archive_manager import ArchiveManager
@@ -22,10 +24,17 @@ class ArchiveStorage:
             INSERT INTO archive (archive_name, project_id, file_path, file_size, created_at, archive_type)
             VALUES (?, ?, ?, ?, ?, ?)
         """
-        execute_query(query, (
-            os.path.basename(archive_path), project_id, archive_path, file_size,
-            datetime.now().isoformat(), "project"
-        ))
+        execute_query(
+            query,
+            (
+                os.path.basename(archive_path),
+                project_id,
+                archive_path,
+                file_size,
+                datetime.now().isoformat(),
+                "project",
+            ),
+        )
         execute_query("UPDATE projects SET status = 'archived' WHERE id = ?", (project_id,))
         print(f"Проєкт {project_number} архівовано")
         return archive_path
@@ -61,7 +70,9 @@ class ArchiveStorage:
         print("-" * 90)
         for arch in archives:
             size_kb = arch[5] / 1024 if arch[5] else 0
-            print(f"{arch[0]:<5} {arch[1]:<35} {str(arch[2]):<20} {arch[4][:10]:<12} {size_kb:>8.1f} КБ")
+            print(
+                f"{arch[0]:<5} {arch[1]:<35} {str(arch[2]):<20} {arch[4][:10]:<12} {size_kb:>8.1f} КБ"
+            )
         print("=" * 90)
         print(f"  Всього архівів: {len(archives)}")
         print("=" * 90)

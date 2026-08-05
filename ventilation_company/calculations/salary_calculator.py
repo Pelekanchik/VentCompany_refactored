@@ -1,9 +1,11 @@
 """
 Розрахунок зарплатного фонду
 """
+
+from datetime import datetime
+
 from ventilation_company.config import POSITIONS
 from ventilation_company.database import execute_query
-from datetime import datetime
 
 
 class SalaryCalculator:
@@ -27,7 +29,7 @@ class SalaryCalculator:
             "base_salary": salary,
             "bonus_percent": bonus,
             "bonus_amount": salary * (bonus / 100),
-            "total_salary": salary + salary * (bonus / 100)
+            "total_salary": salary + salary * (bonus / 100),
         }
         self.employees.append(employee)
         return employee
@@ -45,7 +47,7 @@ class SalaryCalculator:
             "total_taxes": round(total_taxes, 2),
             "net_salary": round(net_salary, 2),
             "esv": round(esv, 2),
-            "total_employer_cost": round(total_salary + esv, 2)
+            "total_employer_cost": round(total_salary + esv, 2),
         }
 
     def calculate_payroll(self, year=None, month=None):
@@ -67,7 +69,7 @@ class SalaryCalculator:
                 "base_salary": emp["base_salary"],
                 "bonus_percent": emp["bonus_percent"],
                 "bonus_amount": round(emp["bonus_amount"], 2),
-                **calc
+                **calc,
             }
             payroll_details.append(detail)
             total_gross += calc["gross_salary"]
@@ -86,7 +88,7 @@ class SalaryCalculator:
             "total_taxes": round(total_taxes, 2),
             "total_net": round(total_net, 2),
             "total_esv": round(total_esv, 2),
-            "total_employer_cost": round(total_employer_cost, 2)
+            "total_employer_cost": round(total_employer_cost, 2),
         }
 
     def save_to_db(self, year=None, month=None):
@@ -101,19 +103,34 @@ class SalaryCalculator:
                     INSERT INTO employees (full_name, position, base_salary, bonus_percent, actual_salary, hired_date)
                     VALUES (?, ?, ?, ?, ?, ?)
                 """
-                employee_id = execute_query(insert_emp, (
-                    detail["full_name"], detail["position"], detail["base_salary"],
-                    detail["bonus_percent"], detail["gross_salary"], datetime.now().isoformat()
-                ))
+                employee_id = execute_query(
+                    insert_emp,
+                    (
+                        detail["full_name"],
+                        detail["position"],
+                        detail["base_salary"],
+                        detail["bonus_percent"],
+                        detail["gross_salary"],
+                        datetime.now().isoformat(),
+                    ),
+                )
             insert_payroll = """
                 INSERT INTO payroll (year, month, employee_id, base_salary, bonus_amount, total_salary, taxes, net_salary)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """
-            execute_query(insert_payroll, (
-                result["year"], result["month"], employee_id,
-                detail["base_salary"], detail["bonus_amount"],
-                detail["gross_salary"], detail["total_taxes"], detail["net_salary"]
-            ))
+            execute_query(
+                insert_payroll,
+                (
+                    result["year"],
+                    result["month"],
+                    employee_id,
+                    detail["base_salary"],
+                    detail["bonus_amount"],
+                    detail["gross_salary"],
+                    detail["total_taxes"],
+                    detail["net_salary"],
+                ),
+            )
         print("Zarplatnyj fond zberezheno v BD")
         return result
 
@@ -123,13 +140,17 @@ class SalaryCalculator:
         print("ZARPLATNYJ FOND".center(90))
         print(f"za {result['month']}.{result['year']}".center(90))
         print("=" * 90)
-        print(f"{'PIB':<25} {'Posada':<18} {'Bazova':<12} {'Premija':<10} {'Vsogo':<12} {'Podatky':<10} {'Na ruky':<12}")
+        print(
+            f"{'PIB':<25} {'Posada':<18} {'Bazova':<12} {'Premija':<10} {'Vsogo':<12} {'Podatky':<10} {'Na ruky':<12}"
+        )
         print("-" * 90)
         for emp in result["details"]:
-            print(f"{emp['full_name']:<25} {emp['position']:<18} "
-                  f"{emp['base_salary']:<12.2f} {emp['bonus_amount']:<10.2f} "
-                  f"{emp['gross_salary']:<12.2f} {emp['total_taxes']:<10.2f} "
-                  f"{emp['net_salary']:<12.2f}")
+            print(
+                f"{emp['full_name']:<25} {emp['position']:<18} "
+                f"{emp['base_salary']:<12.2f} {emp['bonus_amount']:<10.2f} "
+                f"{emp['gross_salary']:<12.2f} {emp['total_taxes']:<10.2f} "
+                f"{emp['net_salary']:<12.2f}"
+            )
         print("-" * 90)
         print(f"VSOHO SPIVROBITNYKIV: {result['employees_count']}")
         print(f"ZAHALNYJ FOND (gross): {result['total_gross']:>15.2f} hrn")

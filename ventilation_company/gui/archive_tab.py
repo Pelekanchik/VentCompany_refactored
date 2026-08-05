@@ -1,27 +1,40 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Вкладка \"Архів\"."""
 
 import tkinter as tk
 from tkinter import ttk
 
-from .base_tab import BaseTab
 from ventilation_company.archive.storage import ArchiveStorage
+
+from .base_tab import BaseTab
 
 
 class ArchiveTab(BaseTab):
     def setup_ui(self):
         c = self.colors
-        tk.Label(self, text="АРХІВ ПРОЕКТІВ", bg=c["bg"], fg=c["fg"],
-                 font=("Arial", 18, "bold")).pack(pady=15)
+        tk.Label(
+            self, text="АРХІВ ПРОЕКТІВ", bg=c["bg"], fg=c["fg"], font=("Arial", 18, "bold")
+        ).pack(pady=15)
 
         btn_frame = tk.Frame(self, bg=c["bg"])
         btn_frame.pack(fill=tk.X, pady=10)
 
-        tk.Button(btn_frame, text="🔄 Оновити", bg=c["accent"], fg="white",
-                  font=("Arial", 11), command=self.refresh).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="📦 Архівувати проект", bg="#9b59b6", fg="white",
-                  font=("Arial", 11), command=self.archive_selected).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            btn_frame,
+            text="🔄 Оновити",
+            bg=c["accent"],
+            fg="white",
+            font=("Arial", 11),
+            command=self.refresh,
+        ).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            btn_frame,
+            text="📦 Архівувати проект",
+            bg="#9b59b6",
+            fg="white",
+            font=("Arial", 11),
+            command=self.archive_selected,
+        ).pack(side=tk.LEFT, padx=5)
 
         columns = ("ID", "Назва архіву", "Проект", "Дата", "Розмір (КБ)")
         self.archive_tree = ttk.Treeview(self, columns=columns, show="headings", height=20)
@@ -44,9 +57,9 @@ class ArchiveTab(BaseTab):
         archives = storage.list_archives()
         for a in archives:
             size_kb = round(a[5] / 1024, 1) if a[5] else 0
-            self.archive_tree.insert("", tk.END, values=(
-                a[0], a[1], f"{a[2]} — {a[3]}", a[4][:10], size_kb
-            ))
+            self.archive_tree.insert(
+                "", tk.END, values=(a[0], a[1], f"{a[2]} — {a[3]}", a[4][:10], size_kb)
+            )
 
     def archive_selected(self):
         self.show_message("Архів", "Функція архівації — додайте вибір проекту")

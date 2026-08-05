@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Вкладка \"Проекти\"."""
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox, ttk
 
-from .base_tab import BaseTab
+from ventilation_company.calculations.cost_calculator import CostCalculator
+from ventilation_company.config import DB_PATH, VENTILATION_TYPES
 from ventilation_company.database import execute_query
 from ventilation_company.models.project import Project
-from ventilation_company.project_builder.project import ProjectService
 from ventilation_company.project_builder.export import ProjectExporter
-from ventilation_company.calculations.cost_calculator import CostCalculator
-from ventilation_company.config import VENTILATION_TYPES, DB_PATH
+from ventilation_company.project_builder.project import ProjectService
+
+from .base_tab import BaseTab
 
 
 class ProjectsTab(BaseTab):
@@ -21,20 +21,62 @@ class ProjectsTab(BaseTab):
         btn_frame = tk.Frame(self, bg=c["bg"])
         btn_frame.pack(fill=tk.X, pady=10)
 
-        tk.Button(btn_frame, text="➕ Новий проект", bg="#27ae60", fg="white",
-                  font=("Arial", 11), command=self.show_new_project_dialog).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="🔄 Оновити", bg=c["accent"], fg="white",
-                  font=("Arial", 11), command=self.refresh).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="✏️ Редагувати", bg=c["accent"], fg="white",
-                  font=("Arial", 11), command=self.edit_selected_project).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="🗑️ Видалити", bg="#e74c3c", fg="white",
-                  font=("Arial", 11), command=self.delete_selected_project).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="🧮 Розрахунок", bg="#27ae60", fg="white",
-                  font=("Arial", 11), command=self.calculate_selected_project).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="📤 Експорт", bg="#9b59b6", fg="white",
-                  font=("Arial", 11), command=self.export_selected_project).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="📐 Креслення", bg="#1abc9c", fg="white",
-                  font=("Arial", 11), command=self.open_project_drawing).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            btn_frame,
+            text="➕ Новий проект",
+            bg="#27ae60",
+            fg="white",
+            font=("Arial", 11),
+            command=self.show_new_project_dialog,
+        ).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            btn_frame,
+            text="🔄 Оновити",
+            bg=c["accent"],
+            fg="white",
+            font=("Arial", 11),
+            command=self.refresh,
+        ).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            btn_frame,
+            text="✏️ Редагувати",
+            bg=c["accent"],
+            fg="white",
+            font=("Arial", 11),
+            command=self.edit_selected_project,
+        ).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            btn_frame,
+            text="🗑️ Видалити",
+            bg="#e74c3c",
+            fg="white",
+            font=("Arial", 11),
+            command=self.delete_selected_project,
+        ).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            btn_frame,
+            text="🧮 Розрахунок",
+            bg="#27ae60",
+            fg="white",
+            font=("Arial", 11),
+            command=self.calculate_selected_project,
+        ).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            btn_frame,
+            text="📤 Експорт",
+            bg="#9b59b6",
+            fg="white",
+            font=("Arial", 11),
+            command=self.export_selected_project,
+        ).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            btn_frame,
+            text="📐 Креслення",
+            bg="#1abc9c",
+            fg="white",
+            font=("Arial", 11),
+            command=self.open_project_drawing,
+        ).pack(side=tk.LEFT, padx=5)
 
         columns = ("ID", "Номер", "Назва", "Замовник", "Тип", "Витрата", "Тиск", "Дата")
         self.projects_tree = ttk.Treeview(self, columns=columns, show="headings", height=20)
@@ -90,16 +132,18 @@ class ProjectsTab(BaseTab):
         calc = CostCalculator(project)
         result = calc.calculate()
         calc.save_calculation()
-        msg = (f"РОЗРАХУНОК ВАРТОСТІ:\n"
-               f"Матеріали: {result['materials_cost']:.2f} грн\n"
-               f"Комплектуючі: {result['components_cost']:.2f} грн\n"
-               f"Роботи: {result['works_cost']:.2f} грн\n"
-               f"Собівартість: {result['total_cost']:.2f} грн\n"
-               f"Націнка ({result['markup_percentage']}%): {result['markup_amount']:.2f} грн\n"
-               f"ПДВ ({result['vat_rate']}%): {result['vat_amount']:.2f} грн\n"
-               f"КІНЦЕВА ЦІНА: {result['final_price']:.2f} грн\n"
-               f"Прибуток: {result['profit']:.2f} грн\n"
-               f"Рентабельність: {result['profit_margin_percent']:.2f}%")
+        msg = (
+            f"РОЗРАХУНОК ВАРТОСТІ:\n"
+            f"Матеріали: {result['materials_cost']:.2f} грн\n"
+            f"Комплектуючі: {result['components_cost']:.2f} грн\n"
+            f"Роботи: {result['works_cost']:.2f} грн\n"
+            f"Собівартість: {result['total_cost']:.2f} грн\n"
+            f"Націнка ({result['markup_percentage']}%): {result['markup_amount']:.2f} грн\n"
+            f"ПДВ ({result['vat_rate']}%): {result['vat_amount']:.2f} грн\n"
+            f"КІНЦЕВА ЦІНА: {result['final_price']:.2f} грн\n"
+            f"Прибуток: {result['profit']:.2f} грн\n"
+            f"Рентабельність: {result['profit_margin_percent']:.2f}%"
+        )
         self.show_message("Розрахунок", msg)
 
     def export_selected_project(self):
@@ -123,6 +167,7 @@ class ProjectsTab(BaseTab):
             return
         try:
             from ventilation_company.drawing_editor import launch_editor
+
             launch_editor(DB_PATH, pid, project.name)
         except Exception as e:
             self.show_error("Помилка", f"Не вдалося відкрити редактор: {e}")
@@ -136,8 +181,13 @@ class ProjectsTab(BaseTab):
         dialog.transient(self.root)
         dialog.grab_set()
 
-        tk.Label(dialog, text="СТВОРЕННЯ НОВОГО ПРОЕКТУ", bg=c["bg"], fg=c["fg"],
-                 font=("Arial", 18, "bold")).pack(pady=15)
+        tk.Label(
+            dialog,
+            text="СТВОРЕННЯ НОВОГО ПРОЕКТУ",
+            bg=c["bg"],
+            fg=c["fg"],
+            font=("Arial", 18, "bold"),
+        ).pack(pady=15)
 
         fields = [
             ("Назва проекту*:", "name", ""),
@@ -150,7 +200,9 @@ class ProjectsTab(BaseTab):
         for label, key, default in fields:
             row = tk.Frame(dialog, bg=c["bg"])
             row.pack(fill="x", padx=40, pady=5)
-            tk.Label(row, text=label, bg=c["bg"], fg=c["fg"], font=("Arial", 11), width=22, anchor="e").pack(side=tk.LEFT)
+            tk.Label(
+                row, text=label, bg=c["bg"], fg=c["fg"], font=("Arial", 11), width=22, anchor="e"
+            ).pack(side=tk.LEFT)
             e = tk.Entry(row, font=("Arial", 11), width=40)
             e.insert(0, default)
             e.pack(side=tk.LEFT, padx=5)
@@ -158,9 +210,24 @@ class ProjectsTab(BaseTab):
 
         row = tk.Frame(dialog, bg=c["bg"])
         row.pack(fill="x", padx=40, pady=5)
-        tk.Label(row, text="Тип вентиляції:", bg=c["bg"], fg=c["fg"], font=("Arial", 11), width=22, anchor="e").pack(side=tk.LEFT)
+        tk.Label(
+            row,
+            text="Тип вентиляції:",
+            bg=c["bg"],
+            fg=c["fg"],
+            font=("Arial", 11),
+            width=22,
+            anchor="e",
+        ).pack(side=tk.LEFT)
         type_var = tk.StringVar(value="Припливна")
-        ttk.Combobox(row, textvariable=type_var, values=VENTILATION_TYPES, font=("Arial", 11), width=38, state="readonly").pack(side=tk.LEFT, padx=5)
+        ttk.Combobox(
+            row,
+            textvariable=type_var,
+            values=VENTILATION_TYPES,
+            font=("Arial", 11),
+            width=38,
+            state="readonly",
+        ).pack(side=tk.LEFT, padx=5)
 
         def create_project():
             name = entries["name"].get().strip()
@@ -174,17 +241,26 @@ class ProjectsTab(BaseTab):
                 messagebox.showerror("Помилка", str(e))
                 return
             project = Project(
-                name=name, client=entries["client"].get().strip(),
+                name=name,
+                client=entries["client"].get().strip(),
                 address=entries["address"].get().strip(),
-                ventilation_type=type_var.get(), air_flow=airflow, pressure=pressure
+                ventilation_type=type_var.get(),
+                air_flow=airflow,
+                pressure=pressure,
             )
             ProjectService.save_to_db(project)
             dialog.destroy()
             self.refresh()
             self.show_message("Успіх", "Проект створено!")
 
-        tk.Button(dialog, text="💾 Створити проект", bg="#27ae60", fg="white",
-                  font=("Arial", 12, "bold"), command=create_project).pack(pady=20)
+        tk.Button(
+            dialog,
+            text="💾 Створити проект",
+            bg="#27ae60",
+            fg="white",
+            font=("Arial", 12, "bold"),
+            command=create_project,
+        ).pack(pady=20)
 
     def show_edit_project_dialog(self, pid):
         project = ProjectService.load_from_db(pid)
@@ -205,7 +281,15 @@ class ProjectsTab(BaseTab):
         def make_field(parent, label_text, default, width=40):
             row = tk.Frame(parent, bg=c["bg"])
             row.pack(fill="x", pady=2, padx=5)
-            tk.Label(row, text=label_text, bg=c["bg"], fg=c["fg"], font=("Arial", 10), width=20, anchor="e").pack(side=tk.LEFT)
+            tk.Label(
+                row,
+                text=label_text,
+                bg=c["bg"],
+                fg=c["fg"],
+                font=("Arial", 10),
+                width=20,
+                anchor="e",
+            ).pack(side=tk.LEFT)
             e = tk.Entry(row, font=("Arial", 10), width=width)
             e.insert(0, default)
             e.pack(side=tk.LEFT, padx=5, fill="x", expand=True)
@@ -217,17 +301,42 @@ class ProjectsTab(BaseTab):
 
         row = tk.Frame(tab_main, bg=c["bg"])
         row.pack(fill="x", pady=2, padx=5)
-        tk.Label(row, text="Тип вентиляції:", bg=c["bg"], fg=c["fg"], font=("Arial", 10), width=20, anchor="e").pack(side=tk.LEFT)
+        tk.Label(
+            row,
+            text="Тип вентиляції:",
+            bg=c["bg"],
+            fg=c["fg"],
+            font=("Arial", 10),
+            width=20,
+            anchor="e",
+        ).pack(side=tk.LEFT)
         type_var = tk.StringVar(value=project.ventilation_type)
-        ttk.Combobox(row, textvariable=type_var, values=VENTILATION_TYPES, font=("Arial", 10), width=38, state="readonly").pack(side=tk.LEFT, padx=5, fill="x", expand=True)
+        ttk.Combobox(
+            row,
+            textvariable=type_var,
+            values=VENTILATION_TYPES,
+            font=("Arial", 10),
+            width=38,
+            state="readonly",
+        ).pack(side=tk.LEFT, padx=5, fill="x", expand=True)
 
         row = tk.Frame(tab_main, bg=c["bg"])
         row.pack(fill="x", pady=2, padx=5)
-        tk.Label(row, text="Витрата (м³/год):", bg=c["bg"], fg=c["fg"], font=("Arial", 10), width=20, anchor="e").pack(side=tk.LEFT)
+        tk.Label(
+            row,
+            text="Витрата (м³/год):",
+            bg=c["bg"],
+            fg=c["fg"],
+            font=("Arial", 10),
+            width=20,
+            anchor="e",
+        ).pack(side=tk.LEFT)
         airflow_entry = tk.Entry(row, font=("Arial", 10), width=12)
         airflow_entry.insert(0, str(project.air_flow))
         airflow_entry.pack(side=tk.LEFT, padx=5)
-        tk.Label(row, text="Тиск (Па):", bg=c["bg"], fg=c["fg"], font=("Arial", 10)).pack(side=tk.LEFT, padx=(20, 0))
+        tk.Label(row, text="Тиск (Па):", bg=c["bg"], fg=c["fg"], font=("Arial", 10)).pack(
+            side=tk.LEFT, padx=(20, 0)
+        )
         pressure_entry = tk.Entry(row, font=("Arial", 10), width=12)
         pressure_entry.insert(0, str(project.pressure))
         pressure_entry.pack(side=tk.LEFT, padx=5)
@@ -250,5 +359,11 @@ class ProjectsTab(BaseTab):
             self.refresh()
             self.show_message("Успіх", "Зміни збережено!")
 
-        tk.Button(dialog, text="💾 Зберегти зміни", bg="#27ae60", fg="white",
-                  font=("Arial", 12, "bold"), command=save_changes).pack(pady=10)
+        tk.Button(
+            dialog,
+            text="💾 Зберегти зміни",
+            bg="#27ae60",
+            fg="white",
+            font=("Arial", 12, "bold"),
+            command=save_changes,
+        ).pack(pady=10)

@@ -1,19 +1,18 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Тести для модуля project_builder
 """
 
-import unittest
-import sys
 import os
+import sys
+import unittest
 
 # Додаємо корінь проекту в шлях
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from ventilation_company.config import VENTILATION_TYPES
 from ventilation_company.models.project import Project
-from ventilation_company.project_builder.components import DuctCalculator, ComponentCatalog
-from ventilation_company.config import VENTILATION_TYPES, MATERIALS
+from ventilation_company.project_builder.components import ComponentCatalog, DuctCalculator
 
 
 class TestProject(unittest.TestCase):
@@ -24,7 +23,7 @@ class TestProject(unittest.TestCase):
             address="м. Київ",
             ventilation_type="припливно-витяжна",
             air_flow=5000,
-            pressure=300
+            pressure=300,
         )
 
     def test_project_creation(self):

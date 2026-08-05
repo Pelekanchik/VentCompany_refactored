@@ -1,7 +1,8 @@
 """
 Розрахунок вартості проекту
 """
-from ventilation_company.config import MARKUP_PERCENTAGE, VAT_RATE, OVERHEAD_PERCENTAGE
+
+from ventilation_company.config import MARKUP_PERCENTAGE, OVERHEAD_PERCENTAGE, VAT_RATE
 from ventilation_company.database import execute_query
 
 
@@ -39,12 +40,15 @@ class CostCalculator:
             "vat_rate": VAT_RATE,
             "final_price": round(final_price, 2),
             "profit": round(profit, 2),
-            "profit_margin_percent": round((profit / final_price) * 100, 2) if final_price > 0 else 0
+            "profit_margin_percent": (
+                round((profit / final_price) * 100, 2) if final_price > 0 else 0
+            ),
         }
 
     def save_calculation(self):
         result = self.calculate()
         from datetime import datetime
+
         query = """
             INSERT INTO calculations
             (project_id, calculation_type, materials_cost, components_cost, works_cost,
@@ -52,10 +56,18 @@ class CostCalculator:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
-            result["project_id"], "full", result["materials_cost"], result["components_cost"],
-            result["works_cost"], result["overhead_cost"], result["total_cost"],
-            result["markup_amount"], result["vat_amount"], result["final_price"],
-            result["profit"], datetime.now().isoformat()
+            result["project_id"],
+            "full",
+            result["materials_cost"],
+            result["components_cost"],
+            result["works_cost"],
+            result["overhead_cost"],
+            result["total_cost"],
+            result["markup_amount"],
+            result["vat_amount"],
+            result["final_price"],
+            result["profit"],
+            datetime.now().isoformat(),
         )
         self.calculation_id = execute_query(query, params)
         print(f"Rozrakhunok zberezheno (ID: {self.calculation_id})")

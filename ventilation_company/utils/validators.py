@@ -1,6 +1,7 @@
 """
 Модуль валідації даних
 """
+
 import re
 from datetime import datetime
 

@@ -1,25 +1,25 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Головне вікно VentCompany.
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox, ttk
 
 from ventilation_company.database import init_database
 
+from .accounting_tab import AccountingTab
+from .analytics_tab import AnalyticsTab
+from .archive_tab import ArchiveTab
+from .cad_tab import CADTab
+from .camduct_tab import CamDuctTab
+from .components_tab import ComponentsTab
+from .materials_tab import MaterialsTab
+from .price_list_tab import PriceListTab
+
 # Вкладки
 from .projects_tab import ProjectsTab
-from .components_tab import ComponentsTab
 from .works_tab import WorksTab
-from .materials_tab import MaterialsTab
-from .accounting_tab import AccountingTab
-from .archive_tab import ArchiveTab
-from .analytics_tab import AnalyticsTab
-from .camduct_tab import CamDuctTab
-from .cad_tab import CADTab
-from .price_list_tab import PriceListTab
 
 
 class VentilationApp:
@@ -31,16 +31,46 @@ class VentilationApp:
         self.root.minsize(1400, 900)
 
         self.themes = {
-            "Світла": {"bg": "#f0f0f0", "fg": "#333333", "sidebar": "#2c3e50",
-                       "sidebar_fg": "white", "accent": "#3498db", "card": "white"},
-            "Темна": {"bg": "#1a1a2e", "fg": "#eaeaea", "sidebar": "#16213e",
-                      "sidebar_fg": "#eaeaea", "accent": "#e94560", "card": "#0f3460"},
-            "Зелена": {"bg": "#e8f5e9", "fg": "#1b5e20", "sidebar": "#2e7d32",
-                       "sidebar_fg": "white", "accent": "#66bb6a", "card": "#c8e6c9"},
-            "Синя": {"bg": "#e3f2fd", "fg": "#0d47a1", "sidebar": "#1565c0",
-                      "sidebar_fg": "white", "accent": "#42a5f5", "card": "#bbdefb"},
-            "Помаранчева": {"bg": "#fff3e0", "fg": "#e65100", "sidebar": "#ef6c00",
-                             "sidebar_fg": "white", "accent": "#ff9800", "card": "#ffe0b2"},
+            "Світла": {
+                "bg": "#f0f0f0",
+                "fg": "#333333",
+                "sidebar": "#2c3e50",
+                "sidebar_fg": "white",
+                "accent": "#3498db",
+                "card": "white",
+            },
+            "Темна": {
+                "bg": "#1a1a2e",
+                "fg": "#eaeaea",
+                "sidebar": "#16213e",
+                "sidebar_fg": "#eaeaea",
+                "accent": "#e94560",
+                "card": "#0f3460",
+            },
+            "Зелена": {
+                "bg": "#e8f5e9",
+                "fg": "#1b5e20",
+                "sidebar": "#2e7d32",
+                "sidebar_fg": "white",
+                "accent": "#66bb6a",
+                "card": "#c8e6c9",
+            },
+            "Синя": {
+                "bg": "#e3f2fd",
+                "fg": "#0d47a1",
+                "sidebar": "#1565c0",
+                "sidebar_fg": "white",
+                "accent": "#42a5f5",
+                "card": "#bbdefb",
+            },
+            "Помаранчева": {
+                "bg": "#fff3e0",
+                "fg": "#e65100",
+                "sidebar": "#ef6c00",
+                "sidebar_fg": "white",
+                "accent": "#ff9800",
+                "card": "#ffe0b2",
+            },
         }
         self.current_theme = "Світла"
         self.colors = self.themes[self.current_theme]
@@ -57,8 +87,12 @@ class VentilationApp:
         self.sidebar_frame.configure(bg=c["sidebar"])
         self.content_frame.configure(bg=c["bg"])
         for btn in self.sidebar_buttons:
-            btn.configure(bg=c["sidebar"], fg=c["sidebar_fg"],
-                         activebackground=c["accent"], activeforeground="white")
+            btn.configure(
+                bg=c["sidebar"],
+                fg=c["sidebar_fg"],
+                activebackground=c["accent"],
+                activeforeground="white",
+            )
         self.header_label.configure(bg=c["bg"], fg=c["fg"])
         for frame in self.tabs.values():
             frame.configure(bg=c["bg"])
@@ -77,9 +111,10 @@ class VentilationApp:
         self.root.config(menu=menubar)
 
         theme_menu = tk.Menu(menubar, tearoff=0)
-        for theme_name in self.themes.keys():
-            theme_menu.add_command(label=theme_name,
-                                   command=lambda t=theme_name: self.change_theme(t))
+        for theme_name in self.themes:
+            theme_menu.add_command(
+                label=theme_name, command=lambda t=theme_name: self.change_theme(t)
+            )
         menubar.add_cascade(label="Тема", menu=theme_menu)
 
         action_menu = tk.Menu(menubar, tearoff=0)
@@ -97,9 +132,9 @@ class VentilationApp:
         self.current_theme = theme_name
         self.colors = self.themes[theme_name]
         self.apply_theme()
-        if hasattr(self, '_current_tab_name') and self._current_tab_name in self.tabs:
+        if hasattr(self, "_current_tab_name") and self._current_tab_name in self.tabs:
             tab = self.tabs[self._current_tab_name]
-            if hasattr(tab, 'refresh'):
+            if hasattr(tab, "refresh"):
                 tab.refresh()
         messagebox.showinfo("Тему змінено", f"Встановлено тему: {theme_name}")
 
@@ -109,9 +144,14 @@ class VentilationApp:
         self.sidebar_frame.pack(side=tk.LEFT, fill=tk.Y)
         self.sidebar_frame.pack_propagate(False)
 
-        logo_label = tk.Label(self.sidebar_frame, text="ВЕНТ-ФІРМА",
-                              bg=c["sidebar"], fg=c["sidebar_fg"],
-                              font=("Arial", 20, "bold"), pady=20)
+        logo_label = tk.Label(
+            self.sidebar_frame,
+            text="ВЕНТ-ФІРМА",
+            bg=c["sidebar"],
+            fg=c["sidebar_fg"],
+            font=("Arial", 20, "bold"),
+            pady=20,
+        )
         logo_label.pack(fill=tk.X)
 
         tk.Frame(self.sidebar_frame, bg=c["accent"], height=2).pack(fill=tk.X, padx=10)
@@ -130,19 +170,32 @@ class VentilationApp:
         ]
 
         for text, tab_id, title in tabs_config:
-            btn = tk.Button(self.sidebar_frame, text=text, bg=c["sidebar"],
-                           fg=c["sidebar_fg"], font=("Arial", 12),
-                           activebackground=c["accent"], activeforeground="white",
-                           bd=0, pady=12, cursor="hand2",
-                           command=lambda tid=tab_id, ttl=title: self.show_tab(tid, ttl))
+            btn = tk.Button(
+                self.sidebar_frame,
+                text=text,
+                bg=c["sidebar"],
+                fg=c["sidebar_fg"],
+                font=("Arial", 12),
+                activebackground=c["accent"],
+                activeforeground="white",
+                bd=0,
+                pady=12,
+                cursor="hand2",
+                command=lambda tid=tab_id, ttl=title: self.show_tab(tid, ttl),
+            )
             btn.pack(fill=tk.X, padx=10, pady=2)
             self.sidebar_buttons.append(btn)
 
         tk.Frame(self.sidebar_frame, bg=c["accent"], height=2).pack(fill=tk.X, padx=10, pady=10)
 
-        self.status_label = tk.Label(self.sidebar_frame, text="Система активна",
-                                     bg=c["sidebar"], fg=c["sidebar_fg"],
-                                     font=("Arial", 9), pady=10)
+        self.status_label = tk.Label(
+            self.sidebar_frame,
+            text="Система активна",
+            bg=c["sidebar"],
+            fg=c["sidebar_fg"],
+            font=("Arial", 9),
+            pady=10,
+        )
         self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
 
     def create_content_area(self):
@@ -175,16 +228,16 @@ class VentilationApp:
         # Заголовок прибрано
         self._current_tab_name = tab_name
 
-        for name, frame in self.tabs.items():
+        for _name, frame in self.tabs.items():
             frame.pack_forget()
 
         if tab_name not in self.tabs:
-            TabClass = self._tab_classes[tab_name]
-            self.tabs[tab_name] = TabClass(self.tabs_container, self)
+            tab_class = self._tab_classes[tab_name]
+            self.tabs[tab_name] = tab_class(self.tabs_container, self)
 
         tab = self.tabs[tab_name]
         tab.pack(fill=tk.BOTH, expand=True)
-        if hasattr(tab, 'refresh'):
+        if hasattr(tab, "refresh"):
             tab.refresh()
 
         self.status_label.config(text=f"Активна вкладка: {title}")
@@ -192,6 +245,7 @@ class VentilationApp:
     def generate_full_report(self):
         try:
             from ventilation_company.archive.reports import ReportGenerator
+
             gen = ReportGenerator()
             report = gen.generate_full_report()
             messagebox.showinfo("Звіт згенеровано", f"Звіт збережено:\n{report}")
@@ -202,7 +256,8 @@ class VentilationApp:
         self.show_tab("analytics", "АНАЛІТИЧНА ПАНЕЛЬ")
 
     def show_about(self):
-        messagebox.showinfo("Про програму",
+        messagebox.showinfo(
+            "Про програму",
             "VentCompany v2.0\n"
             "Система управління вентиляційною фірмою\n\n"
             "Можливості:\n"
@@ -210,4 +265,5 @@ class VentilationApp:
             "• Калькуляція витрат\n"
             "• Розкрій листового металу\n"
             "• 2D CAD редактор\n"
-            "• Архів та аналітика")
+            "• Архів та аналітика",
+        )

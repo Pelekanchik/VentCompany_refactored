@@ -1,7 +1,9 @@
 """
 Сервіс шаблонів розрахунків
 """
-from typing import List, Dict, Any, Optional
+
+from typing import Any
+
 from ventilation_company.database.repositories.template_repo import TemplateRepo
 
 
@@ -9,20 +11,19 @@ class TemplateService:
     """Сервіс для управління шаблонами розрахунків."""
 
     @staticmethod
-    def get_all_templates() -> List[Dict[str, Any]]:
+    def get_all_templates() -> list[dict[str, Any]]:
         """Повертає всі шаблони."""
         rows = TemplateRepo.get_all()
         return [dict(row) for row in rows]
 
     @staticmethod
-    def get_template(template_id: int) -> Optional[Dict[str, Any]]:
+    def get_template(template_id: int) -> dict[str, Any] | None:
         """Повертає шаблон за ID."""
         row = TemplateRepo.get_by_id(template_id)
         return dict(row) if row else None
 
     @staticmethod
-    def create_template(name: str, description: str = "",
-                        items_data: List[Dict] = None) -> int:
+    def create_template(name: str, description: str = "", items_data: list[dict] = None) -> int:
         """Створює новий шаблон."""
         return TemplateRepo.add(name, description, items_data)
 
@@ -37,8 +38,9 @@ class TemplateService:
         TemplateRepo.delete(template_id)
 
     @staticmethod
-    def apply_template(template_id: int, client_name: str = "",
-                       client_phone: str = "") -> Optional[int]:
+    def apply_template(
+        template_id: int, client_name: str = "", client_phone: str = ""
+    ) -> int | None:
         """Застосовує шаблон — створює новий розрахунок на основі шаблону."""
         from ventilation_company.database.repositories.calc_repo import CalcRepo
 
@@ -47,6 +49,7 @@ class TemplateService:
             return None
 
         import json
+
         calc_id = CalcRepo.add_calculation(client_name, client_phone)
 
         items_data = json.loads(template["items_data"]) if template["items_data"] else []

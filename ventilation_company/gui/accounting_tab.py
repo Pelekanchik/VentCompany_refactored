@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """Вкладка \"Бухгалтерія\"."""
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox, ttk
 
-from .base_tab import BaseTab
-from ventilation_company.calculations.salary_calculator import SalaryCalculator
 from ventilation_company.calculations.expenses import ExpenseTracker
 from ventilation_company.calculations.pricing import PricingEngine
+from ventilation_company.calculations.salary_calculator import SalaryCalculator
+
+from .base_tab import BaseTab
 
 
 class AccountingTab(BaseTab):
@@ -57,23 +57,34 @@ class AccountingTab(BaseTab):
 
     def _build_calculations(self, parent):
         c = self.colors
-        tk.Label(parent, text="КАЛЬКУЛЯТОР ВАРТОСТІ", bg=c["bg"], fg=c["fg"],
-                 font=("Arial", 16, "bold")).pack(pady=10)
+        tk.Label(
+            parent, text="КАЛЬКУЛЯТОР ВАРТОСТІ", bg=c["bg"], fg=c["fg"], font=("Arial", 16, "bold")
+        ).pack(pady=10)
         fields = [("Базова собівартість (грн):", "cost")]
         self.calc_entries = {}
         for label, key in fields:
             row = tk.Frame(parent, bg=c["bg"])
             row.pack(fill="x", padx=50, pady=5)
-            tk.Label(row, text=label, bg=c["bg"], fg=c["fg"], font=("Arial", 11), width=25, anchor="e").pack(side=tk.LEFT)
+            tk.Label(
+                row, text=label, bg=c["bg"], fg=c["fg"], font=("Arial", 11), width=25, anchor="e"
+            ).pack(side=tk.LEFT)
             widget = tk.Entry(row, font=("Arial", 11), width=20)
             widget.insert(0, "10000")
             self.calc_entries[key] = widget
             widget.pack(side=tk.LEFT, padx=5)
 
-        self.calc_result = tk.Label(parent, text="", bg=c["bg"], fg=c["fg"], font=("Arial", 12), justify="left")
+        self.calc_result = tk.Label(
+            parent, text="", bg=c["bg"], fg=c["fg"], font=("Arial", 12), justify="left"
+        )
         self.calc_result.pack(pady=20)
-        tk.Button(parent, text="🧮 Розрахувати", bg=c["accent"], fg="white",
-                  font=("Arial", 12), command=self.do_calculation).pack(pady=10)
+        tk.Button(
+            parent,
+            text="🧮 Розрахувати",
+            bg=c["accent"],
+            fg="white",
+            font=("Arial", 12),
+            command=self.do_calculation,
+        ).pack(pady=10)
 
     def do_calculation(self):
         try:
@@ -83,52 +94,92 @@ class AccountingTab(BaseTab):
             return
         engine = PricingEngine(base_cost)
         result = engine.cost_plus_pricing()
-        text = (f"Собівартість: {result['base_cost']:.2f} грн\n"
-                f"Націнка: {result['markup_amount']:.2f} грн\n"
-                f"ПДВ: {result['vat_amount']:.2f} грн\n"
-                f"КІНЦЕВА ЦІНА: {result['final_price']:.2f} грн\n"
-                f"Прибуток: {result['profit']:.2f} грн\n"
-                f"Маржа: {result['profit_margin']:.2f}%")
+        text = (
+            f"Собівартість: {result['base_cost']:.2f} грн\n"
+            f"Націнка: {result['markup_amount']:.2f} грн\n"
+            f"ПДВ: {result['vat_amount']:.2f} грн\n"
+            f"КІНЦЕВА ЦІНА: {result['final_price']:.2f} грн\n"
+            f"Прибуток: {result['profit']:.2f} грн\n"
+            f"Маржа: {result['profit_margin']:.2f}%"
+        )
         self.calc_result.config(text=text)
 
     def _build_salary(self, parent):
         c = self.colors
-        tk.Label(parent, text="РОЗРАХУНОК ЗАРПЛАТИ", bg=c["bg"], fg=c["fg"],
-                 font=("Arial", 16, "bold")).pack(pady=10)
+        tk.Label(
+            parent, text="РОЗРАХУНОК ЗАРПЛАТИ", bg=c["bg"], fg=c["fg"], font=("Arial", 16, "bold")
+        ).pack(pady=10)
 
         row = tk.Frame(parent, bg=c["bg"])
         row.pack(fill="x", padx=50, pady=5)
-        tk.Label(row, text="ПІБ працівника:", bg=c["bg"], fg=c["fg"], font=("Arial", 11), width=15, anchor="e").pack(side=tk.LEFT)
+        tk.Label(
+            row,
+            text="ПІБ працівника:",
+            bg=c["bg"],
+            fg=c["fg"],
+            font=("Arial", 11),
+            width=15,
+            anchor="e",
+        ).pack(side=tk.LEFT)
         self.salary_name = tk.Entry(row, font=("Arial", 11), width=30)
         self.salary_name.pack(side=tk.LEFT, padx=5)
 
         row = tk.Frame(parent, bg=c["bg"])
         row.pack(fill="x", padx=50, pady=5)
-        tk.Label(row, text="Посада:", bg=c["bg"], fg=c["fg"], font=("Arial", 11), width=15, anchor="e").pack(side=tk.LEFT)
+        tk.Label(
+            row, text="Посада:", bg=c["bg"], fg=c["fg"], font=("Arial", 11), width=15, anchor="e"
+        ).pack(side=tk.LEFT)
         from ventilation_company.config import POSITIONS
-        self.salary_position = ttk.Combobox(row, values=list(POSITIONS.keys()), font=("Arial", 11), width=28, state="readonly")
+
+        self.salary_position = ttk.Combobox(
+            row, values=list(POSITIONS.keys()), font=("Arial", 11), width=28, state="readonly"
+        )
         self.salary_position.pack(side=tk.LEFT, padx=5)
         if POSITIONS:
             self.salary_position.current(0)
 
         row = tk.Frame(parent, bg=c["bg"])
         row.pack(fill="x", padx=50, pady=5)
-        tk.Label(row, text="Базова ставка:", bg=c["bg"], fg=c["fg"], font=("Arial", 11), width=15, anchor="e").pack(side=tk.LEFT)
+        tk.Label(
+            row,
+            text="Базова ставка:",
+            bg=c["bg"],
+            fg=c["fg"],
+            font=("Arial", 11),
+            width=15,
+            anchor="e",
+        ).pack(side=tk.LEFT)
         self.salary_base = tk.Entry(row, font=("Arial", 11), width=15)
         self.salary_base.insert(0, "15000")
         self.salary_base.pack(side=tk.LEFT, padx=5)
 
         row = tk.Frame(parent, bg=c["bg"])
         row.pack(fill="x", padx=50, pady=5)
-        tk.Label(row, text="Премія (%):", bg=c["bg"], fg=c["fg"], font=("Arial", 11), width=15, anchor="e").pack(side=tk.LEFT)
+        tk.Label(
+            row,
+            text="Премія (%):",
+            bg=c["bg"],
+            fg=c["fg"],
+            font=("Arial", 11),
+            width=15,
+            anchor="e",
+        ).pack(side=tk.LEFT)
         self.salary_bonus = tk.Entry(row, font=("Arial", 11), width=15)
         self.salary_bonus.insert(0, "10")
         self.salary_bonus.pack(side=tk.LEFT, padx=5)
 
-        self.salary_result = tk.Label(parent, text="", bg=c["bg"], fg=c["fg"], font=("Arial", 12), justify="left")
+        self.salary_result = tk.Label(
+            parent, text="", bg=c["bg"], fg=c["fg"], font=("Arial", 12), justify="left"
+        )
         self.salary_result.pack(pady=20)
-        tk.Button(parent, text="💰 Розрахувати", bg=c["accent"], fg="white",
-                  font=("Arial", 12), command=self.calculate_salary).pack(pady=10)
+        tk.Button(
+            parent,
+            text="💰 Розрахувати",
+            bg=c["accent"],
+            fg="white",
+            font=("Arial", 12),
+            command=self.calculate_salary,
+        ).pack(pady=10)
 
     def calculate_salary(self):
         try:
@@ -138,27 +189,38 @@ class AccountingTab(BaseTab):
             messagebox.showerror("Помилка", "Введіть коректні числа!")
             return
         calc = SalaryCalculator()
-        calc.add_employee(self.salary_name.get() or "Працівник", self.salary_position.get(), base, bonus)
+        calc.add_employee(
+            self.salary_name.get() or "Працівник", self.salary_position.get(), base, bonus
+        )
         result = calc.calculate_payroll()
         if result["details"]:
             d = result["details"][0]
-            text = (f"Брутто: {d['gross_salary']:.2f} грн\n"
-                    f"ПДФО (18%): {d['pit']:.2f} грн\n"
-                    f"Військовий збір (1.5%): {d['military_tax']:.2f} грн\n"
-                    f"ЄСВ (роботодавець): {d['esv']:.2f} грн\n"
-                    f"До видачі: {d['net_salary']:.2f} грн")
+            text = (
+                f"Брутто: {d['gross_salary']:.2f} грн\n"
+                f"ПДФО (18%): {d['pit']:.2f} грн\n"
+                f"Військовий збір (1.5%): {d['military_tax']:.2f} грн\n"
+                f"ЄСВ (роботодавець): {d['esv']:.2f} грн\n"
+                f"До видачі: {d['net_salary']:.2f} грн"
+            )
         else:
             text = "Додайте працівника"
         self.salary_result.config(text=text)
 
     def _build_expenses(self, parent):
         c = self.colors
-        tk.Label(parent, text="ВИТРАТИ", bg=c["bg"], fg=c["fg"],
-                 font=("Arial", 16, "bold")).pack(pady=10)
+        tk.Label(parent, text="ВИТРАТИ", bg=c["bg"], fg=c["fg"], font=("Arial", 16, "bold")).pack(
+            pady=10
+        )
         btn_frame = tk.Frame(parent, bg=c["bg"])
         btn_frame.pack(fill=tk.X, padx=50, pady=5)
-        tk.Button(btn_frame, text="➕ Додати витрату", bg="#27ae60", fg="white",
-                  font=("Arial", 11), command=self.add_expense).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            btn_frame,
+            text="➕ Додати витрату",
+            bg="#27ae60",
+            fg="white",
+            font=("Arial", 11),
+            command=self.add_expense,
+        ).pack(side=tk.LEFT, padx=5)
 
         columns = ("Дата", "Категорія", "Сума", "Опис")
         self.expenses_tree = ttk.Treeview(parent, columns=columns, show="headings", height=12)
@@ -180,7 +242,9 @@ class AccountingTab(BaseTab):
         for label, key in [("Категорія:", "cat"), ("Сума:", "sum"), ("Опис:", "desc")]:
             row = tk.Frame(dialog, bg=c["bg"])
             row.pack(fill="x", padx=20, pady=5)
-            tk.Label(row, text=label, bg=c["bg"], fg=c["fg"], font=("Arial", 11), width=12, anchor="e").pack(side=tk.LEFT)
+            tk.Label(
+                row, text=label, bg=c["bg"], fg=c["fg"], font=("Arial", 11), width=12, anchor="e"
+            ).pack(side=tk.LEFT)
             e = tk.Entry(row, font=("Arial", 11))
             e.pack(side=tk.LEFT, padx=5, fill="x", expand=True)
             entries[key] = e
@@ -195,12 +259,21 @@ class AccountingTab(BaseTab):
             dialog.destroy()
             self.update_expenses_display()
 
-        tk.Button(dialog, text="💾 Зберегти", bg="#27ae60", fg="white", font=("Arial", 11), command=save).pack(pady=15)
+        tk.Button(
+            dialog, text="💾 Зберегти", bg="#27ae60", fg="white", font=("Arial", 11), command=save
+        ).pack(pady=15)
 
     def update_expenses_display(self):
         for item in self.expenses_tree.get_children():
             self.expenses_tree.delete(item)
         for exp in self.tracker.expenses:
-            self.expenses_tree.insert("", tk.END, values=(
-                exp.get("date", "")[:10], exp.get("category", ""), exp.get("amount", 0), exp.get("description", "")
-            ))
+            self.expenses_tree.insert(
+                "",
+                tk.END,
+                values=(
+                    exp.get("date", "")[:10],
+                    exp.get("category", ""),
+                    exp.get("amount", 0),
+                    exp.get("description", ""),
+                ),
+            )

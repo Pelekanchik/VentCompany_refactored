@@ -1,7 +1,9 @@
 """
 Модуль експорту проекту
 """
+
 import os
+
 from ventilation_company.config import REPORTS_DIR
 from ventilation_company.utils.archive_manager import ArchiveManager
 
@@ -16,14 +18,14 @@ class ProjectExporter:
         json_file = self.export_json()
         self.exported_files.append(json_file)
         from project_builder.specifications import SpecificationBuilder
+
         spec_builder = SpecificationBuilder(self.project)
         txt_file = spec_builder.export_to_txt()
         self.exported_files.append(txt_file)
         if include_archive:
             archive_mgr = ArchiveManager()
             archive_path = archive_mgr.create_project_archive(
-                self.project.project_number,
-                self.exported_files
+                self.project.project_number, self.exported_files
             )
             self.exported_files.append(archive_path)
         print(f"Eksport zaversheno! Stvoreno {len(self.exported_files)} fajliv")

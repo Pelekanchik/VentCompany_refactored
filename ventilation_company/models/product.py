@@ -1,8 +1,9 @@
 """
 Моделі виробів прайс-листа (Product, PriceHistoryEntry)
 """
+
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import Any
 
 
 class PriceHistoryEntry:
@@ -18,19 +19,13 @@ class PriceHistoryEntry:
         """Різниця між новою та старою ціною."""
         return round(self.new_price - self.old_price, 2)
 
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "date": self.date,
-            "old_price": self.old_price,
-            "new_price": self.new_price
-        }
+    def to_dict(self) -> dict[str, Any]:
+        return {"date": self.date, "old_price": self.old_price, "new_price": self.new_price}
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PriceHistoryEntry":
+    def from_dict(cls, data: dict[str, Any]) -> "PriceHistoryEntry":
         return cls(
-            data.get("date", ""),
-            float(data.get("old_price", 0)),
-            float(data.get("new_price", 0))
+            data.get("date", ""), float(data.get("old_price", 0)), float(data.get("new_price", 0))
         )
 
     def __repr__(self) -> str:
@@ -41,18 +36,36 @@ class Product:
     """Модель виробу вентиляційної системи."""
 
     CATEGORIES = [
-        "Вентилятор", "Труба прямокутна", "Труба кругла", "Фасонка",
-        "Заслінка", "Решітка", "Клапан", "Комплектуюче", "Інше"
+        "Вентилятор",
+        "Труба прямокутна",
+        "Труба кругла",
+        "Фасонка",
+        "Заслінка",
+        "Решітка",
+        "Клапан",
+        "Комплектуюче",
+        "Інше",
     ]
 
     MATERIALS = ["цинк", "нержавійка"]
 
-    def __init__(self, product_id: str, date_added: str, name: str,
-                 price_per_unit: float = 0.0, quantity: float = 1.0,
-                 length: float = 0.0, width: float = 0.0, height: float = 0.0,
-                 diameter: float = 0.0, material: str = "", thickness: float = 0.0,
-                 category: str = "Інше", notes: str = "",
-                 price_history: Optional[List[PriceHistoryEntry]] = None):
+    def __init__(
+        self,
+        product_id: str,
+        date_added: str,
+        name: str,
+        price_per_unit: float = 0.0,
+        quantity: float = 1.0,
+        length: float = 0.0,
+        width: float = 0.0,
+        height: float = 0.0,
+        diameter: float = 0.0,
+        material: str = "",
+        thickness: float = 0.0,
+        category: str = "Інше",
+        notes: str = "",
+        price_history: list[PriceHistoryEntry] | None = None,
+    ):
         self.id: str = product_id
         self.date_added: str = date_added
         self.name: str = name
@@ -66,7 +79,7 @@ class Product:
         self.thickness: float = float(thickness) if thickness else 0.0
         self.category: str = category if category in self.CATEGORIES else "Інше"
         self.notes: str = notes
-        self.price_history: List[PriceHistoryEntry] = price_history or []
+        self.price_history: list[PriceHistoryEntry] = price_history or []
 
     @property
     def total_price(self) -> float:
@@ -94,15 +107,16 @@ class Product:
 
     def record_price_change(self, old_price: float) -> None:
         """Записує зміну ціни в історію."""
-        self.price_history.append(PriceHistoryEntry(
-            datetime.now().strftime("%d.%m.%Y %H:%M"),
-            old_price, self.price_per_unit
-        ))
+        self.price_history.append(
+            PriceHistoryEntry(
+                datetime.now().strftime("%d.%m.%Y %H:%M"), old_price, self.price_per_unit
+            )
+        )
         # Обмежуємо історію 10 записами
         if len(self.price_history) > 10:
             self.price_history = self.price_history[-10:]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "date_added": self.date_added,
@@ -117,15 +131,12 @@ class Product:
             "thickness": self.thickness,
             "category": self.category,
             "notes": self.notes,
-            "price_history": [h.to_dict() for h in self.price_history]
+            "price_history": [h.to_dict() for h in self.price_history],
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Product":
-        history = [
-            PriceHistoryEntry.from_dict(h)
-            for h in data.get("price_history", [])
-        ]
+    def from_dict(cls, data: dict[str, Any]) -> "Product":
+        history = [PriceHistoryEntry.from_dict(h) for h in data.get("price_history", [])]
         return cls(
             product_id=data.get("id", ""),
             date_added=data.get("date_added", ""),
@@ -140,7 +151,7 @@ class Product:
             thickness=data.get("thickness", 0.0),
             category=data.get("category", "Інше"),
             notes=data.get("notes", ""),
-            price_history=history
+            price_history=history,
         )
 
     def __str__(self) -> str:

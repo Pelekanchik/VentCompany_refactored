@@ -1,8 +1,10 @@
 """
 Модуль статистики виробництва
 """
-from ventilation_company.database import execute_query
+
 from datetime import datetime
+
+from ventilation_company.database import execute_query
 
 
 class ProductionStatistics:
@@ -25,8 +27,11 @@ class ProductionStatistics:
             "total_completed": round(total_completed, 2),
             "total_defects": round(total_defects, 2),
             "total_hours": round(row[3] or 0, 2),
-            "defect_rate": round((total_defects / (total_completed + total_defects) * 100), 2)
-                          if (total_completed + total_defects) > 0 else 0
+            "defect_rate": (
+                round((total_defects / (total_completed + total_defects) * 100), 2)
+                if (total_completed + total_defects) > 0
+                else 0
+            ),
         }
 
     def get_productivity_by_employee(self):
@@ -57,13 +62,19 @@ class ProductionStatistics:
 
     def get_efficiency_metrics(self):
         volume = self.get_production_volume()
-        avg_productivity = (volume["total_completed"] / volume["total_hours"]) if volume["total_hours"] > 0 else 0
-        avg_time_per_project = (volume["total_hours"] / volume["projects_count"]) if volume["projects_count"] > 0 else 0
+        avg_productivity = (
+            (volume["total_completed"] / volume["total_hours"]) if volume["total_hours"] > 0 else 0
+        )
+        avg_time_per_project = (
+            (volume["total_hours"] / volume["projects_count"])
+            if volume["projects_count"] > 0
+            else 0
+        )
         return {
             "avg_productivity_per_hour": round(avg_productivity, 2),
             "avg_time_per_project": round(avg_time_per_project, 2),
             "defect_rate": volume["defect_rate"],
-            "total_projects": volume["projects_count"]
+            "total_projects": volume["projects_count"],
         }
 
     def print_statistics(self):
@@ -73,32 +84,53 @@ class ProductionStatistics:
         print("\n" + "=" * 80)
         print("СТАТИСТИКА ВИРОБНИЦТВА".center(80))
         print("=" * 80)
-        print(f"\nОБСЯГ ВИРОБНИЦТВА")
+        print("\nОБСЯГ ВИРОБНИЦТВА")
         print(f"   Всього проєктів: {volume['projects_count']}")
         print(f"   Виготовлено: {volume['total_completed']:.2f}")
         print(f"   Брак: {volume['total_defects']:.2f} ({volume['defect_rate']:.2f}%)")
         print(f"   Витрачено годин: {volume['total_hours']:.2f}")
-        print(f"\nЕФЕКТИВНІСТЬ")
+        print("\nЕФЕКТИВНІСТЬ")
         print(f"   Середня продуктивність: {efficiency['avg_productivity_per_hour']:.2f} од/год")
         print(f"   Середній час на проєкт: {efficiency['avg_time_per_project']:.2f} год")
         print(f"   Рівень браку: {efficiency['defect_rate']:.2f}%")
-        print(f"\nПРОДУКТИВНІСТЬ ПО СПІВРОБІТНИКАХ")
-        print(f"   {'Співробітник':<25} {'Операцій':<10} {'Виготовлено':<12} {'Годин':<10} {'Продукт.':<10}")
+        print("\nПРОДУКТИВНІСТЬ ПО СПІВРОБІТНИКАХ")
+        print(
+            f"   {'Співробітник':<25} {'Операцій':<10} {'Виготовлено':<12} {'Годин':<10} {'Продукт.':<10}"
+        )
         print("   " + "-" * 67)
         for emp in productivity:
-            print(f"   {str(emp[0]):<25} {emp[1]:<10} {emp[2] or 0:<12.2f} {emp[3] or 0:<10.2f} {emp[4] or 0:<10.2f}")
+            print(
+                f"   {str(emp[0]):<25} {emp[1]:<10} {emp[2] or 0:<12.2f} {emp[3] or 0:<10.2f} {emp[4] or 0:<10.2f}"
+            )
         print("\n" + "=" * 80)
 
-    def add_production_record(self, project_id, stage, completed_quantity,
-                               hours_spent, responsible_employee, defects=0, notes=""):
+    def add_production_record(
+        self,
+        project_id,
+        stage,
+        completed_quantity,
+        hours_spent,
+        responsible_employee,
+        defects=0,
+        notes="",
+    ):
         query = """
             INSERT INTO production
             (project_id, production_date, stage, completed_quantity, defects_quantity,
              hours_spent, responsible_employee, notes)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """
-        execute_query(query, (
-            project_id, datetime.now().isoformat(), stage, completed_quantity,
-            defects, hours_spent, responsible_employee, notes
-        ))
+        execute_query(
+            query,
+            (
+                project_id,
+                datetime.now().isoformat(),
+                stage,
+                completed_quantity,
+                defects,
+                hours_spent,
+                responsible_employee,
+                notes,
+            ),
+        )
         print("Запис виробництва додано")

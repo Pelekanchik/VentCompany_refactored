@@ -2,24 +2,34 @@
 Project Builder — бізнес-логіка управління проєктами.
 Модель Project винесено в ventilation_company.models.project
 """
+
 import os
-from ventilation_company.config import PROJECTS_DIR, VENTILATION_TYPES
+
+from ventilation_company.config import PROJECTS_DIR
 from ventilation_company.database import execute_query
-from ventilation_company.models.project import Project, generate_project_number, validate_project_number
+from ventilation_company.models.project import Project
 
 
 class ProjectService:
     """Сервіс для роботи з проєктами (CRUD + бізнес-логіка)."""
 
     @staticmethod
-    def create(name: str, client: str = "", address: str = "",
-                 ventilation_type: str = "припливна",
-                 air_flow: float = 0, pressure: float = 0) -> Project:
+    def create(
+        name: str,
+        client: str = "",
+        address: str = "",
+        ventilation_type: str = "припливна",
+        air_flow: float = 0,
+        pressure: float = 0,
+    ) -> Project:
         """Створює новий проєкт."""
         project = Project(
-            name=name, client=client, address=address,
+            name=name,
+            client=client,
+            address=address,
             ventilation_type=ventilation_type,
-            air_flow=air_flow, pressure=pressure
+            air_flow=air_flow,
+            pressure=pressure,
         )
         return project
 
@@ -40,10 +50,18 @@ class ProjectService:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
-            project.project_number, project.name, project.client, project.address,
-            project.ventilation_type, project.air_flow, project.pressure,
-            project.created_at, project.updated_at, project.status,
-            project.total_area, project.notes
+            project.project_number,
+            project.name,
+            project.client,
+            project.address,
+            project.ventilation_type,
+            project.air_flow,
+            project.pressure,
+            project.created_at,
+            project.updated_at,
+            project.status,
+            project.total_area,
+            project.notes,
         )
         project.id = execute_query(query, params)
         print(f"Проєкт збережено в БД (ID: {project.id})")
@@ -54,8 +72,14 @@ class ProjectService:
                 """INSERT INTO project_components
                    (project_id, component_name, quantity, unit, unit_price, total_price)
                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (project.id, comp["name"], comp["quantity"],
-                 comp["unit"], comp["unit_price"], comp["total_price"])
+                (
+                    project.id,
+                    comp["name"],
+                    comp["quantity"],
+                    comp["unit"],
+                    comp["unit_price"],
+                    comp["total_price"],
+                ),
             )
 
         # Зберігаємо матеріали
@@ -64,8 +88,14 @@ class ProjectService:
                 """INSERT INTO project_materials
                    (project_id, material_name, quantity, unit, unit_price, total_price)
                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (project.id, mat["name"], mat["quantity"],
-                 mat["unit"], mat["unit_price"], mat["total_price"])
+                (
+                    project.id,
+                    mat["name"],
+                    mat["quantity"],
+                    mat["unit"],
+                    mat["unit_price"],
+                    mat["total_price"],
+                ),
             )
 
         # Зберігаємо роботи
@@ -74,8 +104,14 @@ class ProjectService:
                 """INSERT INTO project_works
                    (project_id, work_name, quantity, unit, unit_price, total_price)
                    VALUES (?, ?, ?, ?, ?, ?)""",
-                (project.id, work["name"], work["quantity"],
-                 work["unit"], work["unit_price"], work["total_price"])
+                (
+                    project.id,
+                    work["name"],
+                    work["quantity"],
+                    work["unit"],
+                    work["unit_price"],
+                    work["total_price"],
+                ),
             )
 
         return project.id
@@ -87,7 +123,7 @@ class ProjectService:
             print("Проєкт не збережено в БД")
             return False
 
-        project.updated_at = __import__('datetime').datetime.now().isoformat()
+        project.updated_at = __import__("datetime").datetime.now().isoformat()
         query = """
             UPDATE projects SET
                 name = ?, client = ?, address = ?, ventilation_type = ?,
@@ -96,12 +132,20 @@ class ProjectService:
             WHERE id = ?
         """
         params = (
-            project.name, project.client, project.address, project.ventilation_type,
-            project.air_flow, project.pressure, project.updated_at, project.status,
-            project.total_area, project.notes, project.id
+            project.name,
+            project.client,
+            project.address,
+            project.ventilation_type,
+            project.air_flow,
+            project.pressure,
+            project.updated_at,
+            project.status,
+            project.total_area,
+            project.notes,
+            project.id,
         )
         execute_query(query, params)
-        print(f"Проєкт оновлено в БД")
+        print("Проєкт оновлено в БД")
         return True
 
     @staticmethod
@@ -119,7 +163,7 @@ class ProjectService:
             ventilation_type=row[5],
             air_flow=row[6] or 0,
             pressure=row[7] or 0,
-            project_number=row[1]
+            project_number=row[1],
         )
         project.id = row[0]
         project.created_at = row[8]
@@ -132,28 +176,43 @@ class ProjectService:
         for comp in execute_query(
             "SELECT * FROM project_components WHERE project_id = ?", (project_id,)
         ):
-            project._components.append({
-                "name": comp[2], "quantity": comp[3], "unit": comp[4],
-                "unit_price": comp[5], "total_price": comp[6]
-            })
+            project._components.append(
+                {
+                    "name": comp[2],
+                    "quantity": comp[3],
+                    "unit": comp[4],
+                    "unit_price": comp[5],
+                    "total_price": comp[6],
+                }
+            )
 
         # Матеріали
         for mat in execute_query(
             "SELECT * FROM project_materials WHERE project_id = ?", (project_id,)
         ):
-            project._materials.append({
-                "name": mat[2], "quantity": mat[3], "unit": mat[4],
-                "unit_price": mat[5], "total_price": mat[6]
-            })
+            project._materials.append(
+                {
+                    "name": mat[2],
+                    "quantity": mat[3],
+                    "unit": mat[4],
+                    "unit_price": mat[5],
+                    "total_price": mat[6],
+                }
+            )
 
         # Роботи
         for work in execute_query(
             "SELECT * FROM project_works WHERE project_id = ?", (project_id,)
         ):
-            project._works.append({
-                "name": work[2], "quantity": work[3], "unit": work[4],
-                "unit_price": work[5], "total_price": work[6]
-            })
+            project._works.append(
+                {
+                    "name": work[2],
+                    "quantity": work[3],
+                    "unit": work[4],
+                    "unit_price": work[5],
+                    "total_price": work[6],
+                }
+            )
 
         return project
 
@@ -174,6 +233,6 @@ class ProjectService:
         data = project.to_dict()
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         with open(filepath, "w", encoding="utf-8") as f:
-            __import__('json').dump(data, f, ensure_ascii=False, indent=2)
+            __import__("json").dump(data, f, ensure_ascii=False, indent=2)
         print(f"Проєкт експортовано: {filepath}")
         return filepath

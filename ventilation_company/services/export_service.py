@@ -1,23 +1,24 @@
 """
 Сервіс експорту розрахунків (Excel, CSV, HTML, друк)
 """
+
 import csv
 import os
 import tempfile
-from typing import List, Dict, Any
 from datetime import datetime
+from typing import Any
 
 
 class ExportService:
     """Сервіс для експорту даних у різні формати."""
 
     @staticmethod
-    def to_csv(data: List[Dict[str, Any]], filepath: str = None,
-               headers: List[str] = None) -> str:
+    def to_csv(data: list[dict[str, Any]], filepath: str = None, headers: list[str] = None) -> str:
         """Експортує дані у CSV."""
         if filepath is None:
-            filepath = os.path.join(tempfile.gettempdir(),
-                                  f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+            filepath = os.path.join(
+                tempfile.gettempdir(), f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            )
 
         if not data:
             return filepath
@@ -33,19 +34,23 @@ class ExportService:
         return filepath
 
     @staticmethod
-    def to_excel(data: List[Dict[str, Any]], filepath: str = None,
-                 sheet_name: str = "Розрахунок") -> str:
+    def to_excel(
+        data: list[dict[str, Any]], filepath: str = None, sheet_name: str = "Розрахунок"
+    ) -> str:
         """Експортує дані у Excel (якщо openpyxl встановлено)."""
         try:
             from openpyxl import Workbook
-            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+            from openpyxl.styles import Alignment, Font, PatternFill
         except ImportError:
             # Fallback на CSV
-            return ExportService.to_csv(data, filepath.replace(".xlsx", ".csv") if filepath else None)
+            return ExportService.to_csv(
+                data, filepath.replace(".xlsx", ".csv") if filepath else None
+            )
 
         if filepath is None:
-            filepath = os.path.join(tempfile.gettempdir(),
-                                  f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx")
+            filepath = os.path.join(
+                tempfile.gettempdir(), f"export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+            )
 
         wb = Workbook()
         ws = wb.active
@@ -79,7 +84,7 @@ class ExportService:
                 try:
                     if cell.value:
                         max_length = max(max_length, len(str(cell.value)))
-                except:
+                except Exception:
                     pass
             ws.column_dimensions[column].width = min(max_length + 2, 50)
 
@@ -87,8 +92,9 @@ class ExportService:
         return filepath
 
     @staticmethod
-    def build_html_report(title: str, data: List[Dict[str, Any]],
-                          summary: Dict[str, Any] = None) -> str:
+    def build_html_report(
+        title: str, data: list[dict[str, Any]], summary: dict[str, Any] = None
+    ) -> str:
         """Будує HTML-звіт для друку."""
         html = f"""<!DOCTYPE html>
 <html>
@@ -140,8 +146,9 @@ tr:nth-child(even) {{ background: #f5f5f5; }}
     def save_html_to_file(html_content: str, filepath: str = None) -> str:
         """Зберігає HTML у файл."""
         if filepath is None:
-            filepath = os.path.join(tempfile.gettempdir(),
-                                  f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html")
+            filepath = os.path.join(
+                tempfile.gettempdir(), f"report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+            )
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(html_content)
         return filepath

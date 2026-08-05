@@ -1,8 +1,9 @@
 """
 Допоміжні функції
 """
-import os
+
 import json
+import os
 from datetime import datetime
 
 
@@ -28,7 +29,7 @@ def save_json(data, filepath):
 
 
 def load_json(filepath):
-    with open(filepath, "r", encoding="utf-8") as f:
+    with open(filepath, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -38,6 +39,7 @@ def calculate_area(length, width):
 
 def calculate_duct_area(diameter, length):
     import math
+
     perimeter = math.pi * diameter
     return perimeter * length
 

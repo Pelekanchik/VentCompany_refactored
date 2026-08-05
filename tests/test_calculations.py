@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Тести для модуля calculations
 """
 
-import unittest
-import sys
 import os
+import sys
+import unittest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from ventilation_company.calculations.pricing import PricingEngine
 from ventilation_company.calculations.salary_calculator import SalaryCalculator
-from ventilation_company.config import MARKUP_PERCENTAGE, VAT_RATE
+from ventilation_company.config import MARKUP_PERCENTAGE
 
 
 class TestPricingEngine(unittest.TestCase):

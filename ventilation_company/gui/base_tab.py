@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Базовий клас для всіх вкладок VentCompany GUI.
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox, ttk
 
 
 class BaseTab(tk.Frame):
@@ -41,10 +40,12 @@ class BaseTab(tk.Frame):
         self.app.status_label.config(text=text)
 
     def _parse_float(self, value_str, field_name, allow_empty=True):
-        raw = (value_str or "").strip().replace(',', '.')
+        raw = (value_str or "").strip().replace(",", ".")
         if allow_empty and not raw:
             return 0.0
         try:
             return float(raw)
-        except ValueError:
-            raise ValueError(f"Невірне значення у полі '{field_name}': '{value_str}'. Введіть число.")
+        except ValueError as err:
+            raise ValueError(
+                f"Невірне значення у полі '{field_name}': '{value_str}'. Введіть число."
+            ) from err

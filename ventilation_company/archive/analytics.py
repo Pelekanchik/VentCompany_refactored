@@ -1,6 +1,7 @@
 """
 Модуль аналітики виробництва
 """
+
 from ventilation_company.database import execute_query
 
 
@@ -19,7 +20,7 @@ class ProductionAnalytics:
             "total_projects": total_row[0],
             "total_clients": total_row[1],
             "by_status": {row[0]: row[1] for row in status_rows},
-            "by_type": {row[0]: row[1] for row in type_rows}
+            "by_type": {row[0]: row[1] for row in type_rows},
         }
 
     def get_financial_stats(self, year=None, month=None):
@@ -38,7 +39,7 @@ class ProductionAnalytics:
             "total_cost": round(row[4] or 0, 2),
             "total_revenue": round(row[5] or 0, 2),
             "total_profit": round(row[6] or 0, 2),
-            "avg_profit_margin": round((row[6] / row[5] * 100) if row[5] else 0, 2)
+            "avg_profit_margin": round((row[6] / row[5] * 100) if row[5] else 0, 2),
         }
 
     def get_top_projects(self, limit=10):
@@ -70,16 +71,16 @@ class ProductionAnalytics:
         print("\n" + "=" * 80)
         print("АНАЛІТИЧНА ПАНЕЛЬ".center(80))
         print("=" * 80)
-        print(f"\nПРОЄКТИ")
+        print("\nПРОЄКТИ")
         print(f"   Всього проєктів: {projects['total_projects']}")
         print(f"   Унікальних замовників: {projects['total_clients']}")
-        print(f"   За статусами:")
-        for status, count in projects['by_status'].items():
+        print("   За статусами:")
+        for status, count in projects["by_status"].items():
             print(f"      * {status}: {count}")
-        print(f"   За типами вентиляції:")
-        for vtype, count in projects['by_type'].items():
+        print("   За типами вентиляції:")
+        for vtype, count in projects["by_type"].items():
             print(f"      * {vtype}: {count}")
-        print(f"\nФІНАНСИ")
+        print("\nФІНАНСИ")
         print(f"   Загальна виручка: {financial['total_revenue']:,.2f} грн")
         print(f"   Загальна собівартість: {financial['total_cost']:,.2f} грн")
         print(f"   Загальний прибуток: {financial['total_profit']:,.2f} грн")
@@ -87,12 +88,12 @@ class ProductionAnalytics:
         print(f"   Витрати на матеріали: {financial['total_materials']:,.2f} грн")
         print(f"   Витрати на комплектуючі: {financial['total_components']:,.2f} грн")
         print(f"   Витрати на роботи: {financial['total_works']:,.2f} грн")
-        print(f"\nТОП-5 ПРОЄКТІВ ЗА ПРИБУТКОМ")
+        print("\nТОП-5 ПРОЄКТІВ ЗА ПРИБУТКОМ")
         print(f"   {'№':<4} {'Проєкт':<20} {'Замовник':<20} {'Виручка':<15} {'Прибуток':<15}")
         print("   " + "-" * 74)
         for i, proj in enumerate(top_projects, 1):
             print(f"   {i:<4} {proj[0]:<20} {str(proj[2]):<20} {proj[3]:<15.2f} {proj[4]:<15.2f}")
-        print(f"\nЗАМОВНИКИ")
+        print("\nЗАМОВНИКИ")
         print(f"   {'Замовник':<30} {'Проєктів':<12} {'Виручка':<15}")
         print("   " + "-" * 57)
         for client in clients[:5]:

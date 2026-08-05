@@ -1,24 +1,24 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Графічний редактор розкрою листового металу (CamDuct-подібний)
 Модуль: вкладка "Розкрій листа"
 """
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-import math
 import json
+import math
 import random
+import tkinter as tk
 from datetime import datetime
+from tkinter import filedialog, messagebox, ttk
 
 
 class SheetPart:
     """Одна деталь для розкрою"""
+
     def __init__(self, part_type, name, width, height, quantity=1, color=None, rotated=False):
-        self.part_type = part_type   # 'rect_duct', 'round_duct', 'elbow', 'tee', 'transition'
+        self.part_type = part_type  # 'rect_duct', 'round_duct', 'elbow', 'tee', 'transition'
         self.name = name
-        self.width = width           # мм (для розгортки)
-        self.height = height         # мм (довжина розгортки)
+        self.width = width  # мм (для розгортки)
+        self.height = height  # мм (довжина розгортки)
         self.quantity = quantity
         self.color = color or self._random_color()
         self.area = width * height / 1_000_000  # м²
@@ -29,9 +29,23 @@ class SheetPart:
         self.rotated = rotated
 
     def _random_color(self):
-        colors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6",
-                  "#1abc9c", "#e67e22", "#34495e", "#16a085", "#d35400",
-                  "#2980b9", "#8e44ad", "#27ae60", "#c0392b", "#f1c40f"]
+        colors = [
+            "#e74c3c",
+            "#3498db",
+            "#2ecc71",
+            "#f39c12",
+            "#9b59b6",
+            "#1abc9c",
+            "#e67e22",
+            "#34495e",
+            "#16a085",
+            "#d35400",
+            "#2980b9",
+            "#8e44ad",
+            "#27ae60",
+            "#c0392b",
+            "#f1c40f",
+        ]
         return random.choice(colors)
 
     def __repr__(self):
@@ -40,11 +54,12 @@ class SheetPart:
 
 class NestingEngine:
     """Двовимірний алгоритм розкладки (Bottom-Left heuristic)"""
+
     def __init__(self, sheet_width, sheet_height, blade_kerf=3):
-        self.sheet_w = sheet_width   # мм
+        self.sheet_w = sheet_width  # мм
         self.sheet_h = sheet_height  # мм
-        self.kerf = blade_kerf       # мм (ширина пропилу)
-        self.sheets = []             # список листів, кожен — список розміщених деталей
+        self.kerf = blade_kerf  # мм (ширина пропилу)
+        self.sheets = []  # список листів, кожен — список розміщених деталей
 
     def reset(self):
         self.sheets = []
@@ -93,11 +108,14 @@ class NestingEngine:
 
         for pw, ph, is_rotated in orientations:
             for cx, cy in candidates:
-                if cx + pw <= self.sheet_w and cy + ph <= self.sheet_h:
-                    if self._no_overlap(sheet, pw, ph, cx, cy):
-                        if best is None or cy < best[1] or (cy == best[1] and cx < best[0]):
-                            best = (cx, cy)
-                            best_rotated = is_rotated
+                if (
+                    cx + pw <= self.sheet_w
+                    and cy + ph <= self.sheet_h
+                    and self._no_overlap(sheet, pw, ph, cx, cy)
+                    and (best is None or cy < best[1] or (cy == best[1] and cx < best[0]))
+                ):
+                    best = (cx, cy)
+                    best_rotated = is_rotated
 
         if best and best_rotated:
             part.width, part.height = part.height, part.width
@@ -106,8 +124,12 @@ class NestingEngine:
 
     def _no_overlap(self, sheet, pw, ph, cx, cy):
         for p in sheet:
-            if not (cx + pw + self.kerf <= p.x or cx >= p.x + p.width + self.kerf or
-                    cy + ph + self.kerf <= p.y or cy >= p.y + p.height + self.kerf):
+            if not (
+                cx + pw + self.kerf <= p.x
+                or cx >= p.x + p.width + self.kerf
+                or cy + ph + self.kerf <= p.y
+                or cy >= p.y + p.height + self.kerf
+            ):
                 return False
         return True
 
@@ -120,7 +142,7 @@ class NestingEngine:
             "sheet_area_m2": self.sheet_w * self.sheet_h / 1_000_000,
             "total_parts_area_m2": total_area / 1_000_000,
             "utilization_percent": round(utilization, 2),
-            "waste_percent": round(100 - utilization, 2)
+            "waste_percent": round(100 - utilization, 2),
         }
 
 
@@ -136,14 +158,20 @@ class CamDuctEditorFrame(tk.Frame):
 
     def __init__(self, parent, colors=None, **kwargs):
         super().__init__(parent, **kwargs)
-        self.colors = colors or {"bg": "#f0f0f0", "fg": "#333333", "accent": "#3498db",
-                                 "card": "white", "sidebar": "#2c3e50", "sidebar_fg": "white"}
+        self.colors = colors or {
+            "bg": "#f0f0f0",
+            "fg": "#333333",
+            "accent": "#3498db",
+            "card": "white",
+            "sidebar": "#2c3e50",
+            "sidebar_fg": "white",
+        }
         self.configure(bg=self.colors["bg"])
 
-        self.parts = []          # список SheetPart
-        self.nesting = None      # NestingEngine
-        self.scale = 0.15        # px на мм
-        self.current_sheet = 0   # поточний лист для перегляду
+        self.parts = []  # список SheetPart
+        self.nesting = None  # NestingEngine
+        self.scale = 0.15  # px на мм
+        self.current_sheet = 0  # поточний лист для перегляду
 
         print("[CamDuct] __init__ start")
         print("[CamDuct] build_ui start")
@@ -173,61 +201,100 @@ class CamDuctEditorFrame(tk.Frame):
 
         def _on_inner_configure(event=None):
             left_canvas.configure(scrollregion=left_canvas.bbox("all"))
+
         inner.bind("<Configure>", _on_inner_configure)
 
         # Прокрутка колесом миші
         def _on_mousewheel(event):
             left_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+
         left_canvas.bind_all("<MouseWheel>", _on_mousewheel)
 
         # --- Параметри листа ---
-        sheet_frame = tk.LabelFrame(inner, text="📐 Параметри листа", bg=self.colors["card"],
-                                    fg=self.colors["fg"], font=("Segoe UI", 11, "bold"), padx=8, pady=8)
+        sheet_frame = tk.LabelFrame(
+            inner,
+            text="📐 Параметри листа",
+            bg=self.colors["card"],
+            fg=self.colors["fg"],
+            font=("Segoe UI", 11, "bold"),
+            padx=8,
+            pady=8,
+        )
         sheet_frame.pack(fill=tk.X, padx=8, pady=(8, 4))
 
-        tk.Label(sheet_frame, text="Стандартний розмір:", bg=self.colors["card"], font=("Segoe UI", 10)).pack(anchor=tk.W)
-        self.sheet_combo = ttk.Combobox(sheet_frame, values=list(self.STANDARD_SHEETS.keys()),
-                                        state="readonly", font=("Segoe UI", 10), width=28)
+        tk.Label(
+            sheet_frame, text="Стандартний розмір:", bg=self.colors["card"], font=("Segoe UI", 10)
+        ).pack(anchor=tk.W)
+        self.sheet_combo = ttk.Combobox(
+            sheet_frame,
+            values=list(self.STANDARD_SHEETS.keys()),
+            state="readonly",
+            font=("Segoe UI", 10),
+            width=28,
+        )
         self.sheet_combo.current(0)
         self.sheet_combo.pack(fill=tk.X, pady=(2, 6))
         self.sheet_combo.bind("<<ComboboxSelected>>", lambda e: self.draw_nesting())
 
         dim_frame = tk.Frame(sheet_frame, bg=self.colors["card"])
         dim_frame.pack(fill=tk.X)
-        tk.Label(dim_frame, text="Ширина:", bg=self.colors["card"], font=("Segoe UI", 10)).pack(side=tk.LEFT)
+        tk.Label(dim_frame, text="Ширина:", bg=self.colors["card"], font=("Segoe UI", 10)).pack(
+            side=tk.LEFT
+        )
         self.sheet_w_entry = tk.Entry(dim_frame, width=8, font=("Segoe UI", 10))
         self.sheet_w_entry.insert(0, "1250")
         self.sheet_w_entry.pack(side=tk.LEFT, padx=(4, 12))
-        tk.Label(dim_frame, text="Висота:", bg=self.colors["card"], font=("Segoe UI", 10)).pack(side=tk.LEFT)
+        tk.Label(dim_frame, text="Висота:", bg=self.colors["card"], font=("Segoe UI", 10)).pack(
+            side=tk.LEFT
+        )
         self.sheet_h_entry = tk.Entry(dim_frame, width=8, font=("Segoe UI", 10))
         self.sheet_h_entry.insert(0, "2500")
         self.sheet_h_entry.pack(side=tk.LEFT, padx=4)
-        tk.Label(dim_frame, text="мм", bg=self.colors["card"], font=("Segoe UI", 10)).pack(side=tk.LEFT)
+        tk.Label(dim_frame, text="мм", bg=self.colors["card"], font=("Segoe UI", 10)).pack(
+            side=tk.LEFT
+        )
 
-        tk.Label(sheet_frame, text="Пропил (керф):", bg=self.colors["card"], font=("Segoe UI", 10)).pack(anchor=tk.W, pady=(6, 2))
+        tk.Label(
+            sheet_frame, text="Пропил (керф):", bg=self.colors["card"], font=("Segoe UI", 10)
+        ).pack(anchor=tk.W, pady=(6, 2))
         self.kerf_entry = tk.Entry(sheet_frame, width=8, font=("Segoe UI", 10))
         self.kerf_entry.insert(0, "3")
         self.kerf_entry.pack(anchor=tk.W)
 
         # --- Додавання деталі ---
-        add_frame = tk.LabelFrame(inner, text="➕ Додати деталь", bg=self.colors["card"],
-                                  fg=self.colors["fg"], font=("Segoe UI", 11, "bold"), padx=8, pady=8)
+        add_frame = tk.LabelFrame(
+            inner,
+            text="➕ Додати деталь",
+            bg=self.colors["card"],
+            fg=self.colors["fg"],
+            font=("Segoe UI", 11, "bold"),
+            padx=8,
+            pady=8,
+        )
         add_frame.pack(fill=tk.X, padx=8, pady=4)
 
-        tk.Label(add_frame, text="Тип виробу:", bg=self.colors["card"], font=("Segoe UI", 10)).pack(anchor=tk.W)
-        self.part_type = ttk.Combobox(add_frame, values=[
-            "Прямокутний повітропровід",
-            "Круглий повітропровід",
-            "Відведення (коліно)",
-            "Трійник",
-            "Перехід",
-            "Заглушка",
-            "Прямокутне відведення",
-            "Прямокутний трійник",
-            "Прямокутний перехід",
-            "Решітка",
-            "Заслінка"
-        ], state="readonly", font=("Segoe UI", 10), width=28)
+        tk.Label(add_frame, text="Тип виробу:", bg=self.colors["card"], font=("Segoe UI", 10)).pack(
+            anchor=tk.W
+        )
+        self.part_type = ttk.Combobox(
+            add_frame,
+            values=[
+                "Прямокутний повітропровід",
+                "Круглий повітропровід",
+                "Відведення (коліно)",
+                "Трійник",
+                "Перехід",
+                "Заглушка",
+                "Прямокутне відведення",
+                "Прямокутний трійник",
+                "Прямокутний перехід",
+                "Решітка",
+                "Заслінка",
+            ],
+            state="readonly",
+            font=("Segoe UI", 10),
+            width=28,
+        )
         self.part_type.current(0)
         self.part_type.pack(fill=tk.X, pady=(2, 6))
         self.part_type.bind("<<ComboboxSelected>>", self.on_part_type_change)
@@ -238,21 +305,42 @@ class CamDuctEditorFrame(tk.Frame):
         self.size_entries = {}
         self.build_size_inputs("rect_duct")
 
-        tk.Label(add_frame, text="Кількість:", bg=self.colors["card"], font=("Segoe UI", 10)).pack(anchor=tk.W, pady=(4, 2))
+        tk.Label(add_frame, text="Кількість:", bg=self.colors["card"], font=("Segoe UI", 10)).pack(
+            anchor=tk.W, pady=(4, 2)
+        )
         self.part_qty = tk.Entry(add_frame, width=8, font=("Segoe UI", 10))
         self.part_qty.insert(0, "1")
         self.part_qty.pack(anchor=tk.W)
 
         btn_frame = tk.Frame(add_frame, bg=self.colors["card"])
         btn_frame.pack(fill=tk.X, pady=8)
-        tk.Button(btn_frame, text="➕ Додати", bg=self.colors["accent"], fg="white",
-                  font=("Segoe UI", 10, "bold"), command=self.add_part).pack(side=tk.LEFT, fill=tk.X, expand=True)
-        tk.Button(btn_frame, text="🗑 Очистити", bg="#e74c3c", fg="white",
-                  font=("Segoe UI", 10), command=self.clear_parts).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(4, 0))
+        tk.Button(
+            btn_frame,
+            text="➕ Додати",
+            bg=self.colors["accent"],
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            command=self.add_part,
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True)
+        tk.Button(
+            btn_frame,
+            text="🗑 Очистити",
+            bg="#e74c3c",
+            fg="white",
+            font=("Segoe UI", 10),
+            command=self.clear_parts,
+        ).pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(4, 0))
 
         # --- Список деталей ---
-        list_frame = tk.LabelFrame(inner, text="📋 Список деталей", bg=self.colors["card"],
-                                   fg=self.colors["fg"], font=("Segoe UI", 11, "bold"), padx=8, pady=4)
+        list_frame = tk.LabelFrame(
+            inner,
+            text="📋 Список деталей",
+            bg=self.colors["card"],
+            fg=self.colors["fg"],
+            font=("Segoe UI", 11, "bold"),
+            padx=8,
+            pady=4,
+        )
         list_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
 
         cols = ("№", "Назва", "Розмір", "К-ть", "Площа")
@@ -273,18 +361,42 @@ class CamDuctEditorFrame(tk.Frame):
 
         btn2 = tk.Frame(inner, bg=self.colors["card"])
         btn2.pack(fill=tk.X, padx=8, pady=4)
-        tk.Button(btn2, text="❌ Видалити вибрану", bg="#c0392b", fg="white",
-                  font=("Segoe UI", 10), command=self.delete_selected_part).pack(fill=tk.X)
+        tk.Button(
+            btn2,
+            text="❌ Видалити вибрану",
+            bg="#c0392b",
+            fg="white",
+            font=("Segoe UI", 10),
+            command=self.delete_selected_part,
+        ).pack(fill=tk.X)
 
         # --- Кнопки дії ---
         act_frame = tk.Frame(inner, bg=self.colors["card"])
         act_frame.pack(fill=tk.X, padx=8, pady=(4, 8))
-        tk.Button(act_frame, text="🧮 РОЗКРИТИ", bg="#27ae60", fg="white",
-                  font=("Segoe UI", 12, "bold"), command=self.run_nesting).pack(fill=tk.X, pady=2)
-        tk.Button(act_frame, text="💾 Зберегти розкрій", bg="#2980b9", fg="white",
-                  font=("Segoe UI", 11), command=self.save_nesting).pack(fill=tk.X, pady=2)
-        tk.Button(act_frame, text="📊 Експорт CSV", bg="#8e44ad", fg="white",
-                  font=("Segoe UI", 11), command=self.export_csv).pack(fill=tk.X, pady=2)
+        tk.Button(
+            act_frame,
+            text="🧮 РОЗКРИТИ",
+            bg="#27ae60",
+            fg="white",
+            font=("Segoe UI", 12, "bold"),
+            command=self.run_nesting,
+        ).pack(fill=tk.X, pady=2)
+        tk.Button(
+            act_frame,
+            text="💾 Зберегти розкрій",
+            bg="#2980b9",
+            fg="white",
+            font=("Segoe UI", 11),
+            command=self.save_nesting,
+        ).pack(fill=tk.X, pady=2)
+        tk.Button(
+            act_frame,
+            text="📊 Експорт CSV",
+            bg="#8e44ad",
+            fg="white",
+            font=("Segoe UI", 11),
+            command=self.export_csv,
+        ).pack(fill=tk.X, pady=2)
 
         # === ЦЕНТР: Canvas ===
         center = tk.Frame(self, bg=self.colors["bg"])
@@ -295,33 +407,72 @@ class CamDuctEditorFrame(tk.Frame):
         toolbar.pack(fill=tk.X, pady=(0, 4))
         toolbar.pack_propagate(False)
 
-        tk.Label(toolbar, text="🔍 Масштаб:", bg=self.colors["sidebar"], fg="white",
-                 font=("Segoe UI", 10)).pack(side=tk.LEFT, padx=10)
+        tk.Label(
+            toolbar,
+            text="🔍 Масштаб:",
+            bg=self.colors["sidebar"],
+            fg="white",
+            font=("Segoe UI", 10),
+        ).pack(side=tk.LEFT, padx=10)
         self.scale_var = tk.DoubleVar(value=0.15)
-        ttk.Scale(toolbar, from_=0.05, to=0.5, variable=self.scale_var, orient=tk.HORIZONTAL,
-                  length=150, command=lambda e: self.draw_nesting()).pack(side=tk.LEFT, padx=5)
-        self.scale_label = tk.Label(toolbar, text="0.15 px/мм", bg=self.colors["sidebar"], fg="white",
-                                    font=("Segoe UI", 10), width=12)
+        ttk.Scale(
+            toolbar,
+            from_=0.05,
+            to=0.5,
+            variable=self.scale_var,
+            orient=tk.HORIZONTAL,
+            length=150,
+            command=lambda e: self.draw_nesting(),
+        ).pack(side=tk.LEFT, padx=5)
+        self.scale_label = tk.Label(
+            toolbar,
+            text="0.15 px/мм",
+            bg=self.colors["sidebar"],
+            fg="white",
+            font=("Segoe UI", 10),
+            width=12,
+        )
         self.scale_label.pack(side=tk.LEFT)
 
-        tk.Label(toolbar, text="📄 Лист:", bg=self.colors["sidebar"], fg="white",
-                 font=("Segoe UI", 10)).pack(side=tk.LEFT, padx=(20, 5))
+        tk.Label(
+            toolbar, text="📄 Лист:", bg=self.colors["sidebar"], fg="white", font=("Segoe UI", 10)
+        ).pack(side=tk.LEFT, padx=(20, 5))
         self.sheet_nav_var = tk.StringVar(value="Лист 1")
-        self.sheet_nav = ttk.Combobox(toolbar, textvariable=self.sheet_nav_var, values=["Лист 1"],
-                                      state="readonly", font=("Segoe UI", 10), width=12)
+        self.sheet_nav = ttk.Combobox(
+            toolbar,
+            textvariable=self.sheet_nav_var,
+            values=["Лист 1"],
+            state="readonly",
+            font=("Segoe UI", 10),
+            width=12,
+        )
         self.sheet_nav.pack(side=tk.LEFT)
         self.sheet_nav.bind("<<ComboboxSelected>>", self.on_sheet_nav)
 
-        tk.Button(toolbar, text="◀", bg=self.colors["sidebar"], fg="white", font=("Segoe UI", 10, "bold"),
-                  command=self.prev_sheet).pack(side=tk.LEFT, padx=2)
-        tk.Button(toolbar, text="▶", bg=self.colors["sidebar"], fg="white", font=("Segoe UI", 10, "bold"),
-                  command=self.next_sheet).pack(side=tk.LEFT, padx=2)
+        tk.Button(
+            toolbar,
+            text="◀",
+            bg=self.colors["sidebar"],
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            command=self.prev_sheet,
+        ).pack(side=tk.LEFT, padx=2)
+        tk.Button(
+            toolbar,
+            text="▶",
+            bg=self.colors["sidebar"],
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            command=self.next_sheet,
+        ).pack(side=tk.LEFT, padx=2)
 
         # Canvas з прокруткою (pack-версія)
         canvas_frame = tk.Frame(center, bg=self.colors["bg"], bd=1, relief=tk.SUNKEN)
         canvas_frame.pack(fill=tk.BOTH, expand=True)
 
-        self.canvas = tk.Canvas(canvas_frame, bg="#e8e8e8", width=600, height=400, highlightthickness=0)
+        self.canvas = tk.Canvas(
+            canvas_frame, bg="#e8e8e8", width=600, height=400, highlightthickness=0
+        )
         self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         vsb = ttk.Scrollbar(canvas_frame, orient="vertical", command=self.canvas.yview)
@@ -338,51 +489,103 @@ class CamDuctEditorFrame(tk.Frame):
         right.pack(side=tk.RIGHT, fill=tk.Y, padx=5, pady=5)
         right.pack_propagate(False)
 
-        res_frame = tk.LabelFrame(right, text="📊 Результат розкрою", bg=self.colors["card"],
-                                  fg=self.colors["fg"], font=("Segoe UI", 11, "bold"), padx=10, pady=10)
+        res_frame = tk.LabelFrame(
+            right,
+            text="📊 Результат розкрою",
+            bg=self.colors["card"],
+            fg=self.colors["fg"],
+            font=("Segoe UI", 11, "bold"),
+            padx=10,
+            pady=10,
+        )
         res_frame.pack(fill=tk.X, padx=8, pady=(8, 4))
 
-        self.res_sheets = tk.Label(res_frame, text="—", font=("Segoe UI", 18, "bold"),
-                                   bg=self.colors["card"], fg=self.colors["accent"])
+        self.res_sheets = tk.Label(
+            res_frame,
+            text="—",
+            font=("Segoe UI", 18, "bold"),
+            bg=self.colors["card"],
+            fg=self.colors["accent"],
+        )
         self.res_sheets.pack()
-        tk.Label(res_frame, text="Листів металу", bg=self.colors["card"], fg="#666",
-                 font=("Segoe UI", 10)).pack()
+        tk.Label(
+            res_frame,
+            text="Листів металу",
+            bg=self.colors["card"],
+            fg="#666",
+            font=("Segoe UI", 10),
+        ).pack()
 
         ttk.Separator(res_frame, orient="horizontal").pack(fill=tk.X, pady=10)
 
-        self.res_util = tk.Label(res_frame, text="—", font=("Segoe UI", 16, "bold"),
-                                 bg=self.colors["card"], fg="#27ae60")
+        self.res_util = tk.Label(
+            res_frame, text="—", font=("Segoe UI", 16, "bold"), bg=self.colors["card"], fg="#27ae60"
+        )
         self.res_util.pack()
-        tk.Label(res_frame, text="Використання листа", bg=self.colors["card"], fg="#666",
-                 font=("Segoe UI", 10)).pack()
+        tk.Label(
+            res_frame,
+            text="Використання листа",
+            bg=self.colors["card"],
+            fg="#666",
+            font=("Segoe UI", 10),
+        ).pack()
 
         ttk.Separator(res_frame, orient="horizontal").pack(fill=tk.X, pady=10)
 
-        self.res_area = tk.Label(res_frame, text="—", font=("Segoe UI", 14, "bold"),
-                                 bg=self.colors["card"])
+        self.res_area = tk.Label(
+            res_frame, text="—", font=("Segoe UI", 14, "bold"), bg=self.colors["card"]
+        )
         self.res_area.pack()
-        tk.Label(res_frame, text="Площа деталей", bg=self.colors["card"], fg="#666",
-                 font=("Segoe UI", 10)).pack()
+        tk.Label(
+            res_frame,
+            text="Площа деталей",
+            bg=self.colors["card"],
+            fg="#666",
+            font=("Segoe UI", 10),
+        ).pack()
 
-        self.res_waste = tk.Label(res_frame, text="—", font=("Segoe UI", 14, "bold"),
-                                  bg=self.colors["card"], fg="#c0392b")
+        self.res_waste = tk.Label(
+            res_frame, text="—", font=("Segoe UI", 14, "bold"), bg=self.colors["card"], fg="#c0392b"
+        )
         self.res_waste.pack(pady=(10, 0))
-        tk.Label(res_frame, text="Відходи", bg=self.colors["card"], fg="#666",
-                 font=("Segoe UI", 10)).pack()
+        tk.Label(
+            res_frame, text="Відходи", bg=self.colors["card"], fg="#666", font=("Segoe UI", 10)
+        ).pack()
 
         # Детальна статистика
-        detail_frame = tk.LabelFrame(right, text="📈 Деталі", bg=self.colors["card"],
-                                     fg=self.colors["fg"], font=("Segoe UI", 11, "bold"), padx=8, pady=8)
+        detail_frame = tk.LabelFrame(
+            right,
+            text="📈 Деталі",
+            bg=self.colors["card"],
+            fg=self.colors["fg"],
+            font=("Segoe UI", 11, "bold"),
+            padx=8,
+            pady=8,
+        )
         detail_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
 
-        self.detail_text = tk.Text(detail_frame, wrap="word", font=("Segoe UI", 10),
-                                   bg="#fafafa", relief=tk.FLAT, height=12, state="disabled")
+        self.detail_text = tk.Text(
+            detail_frame,
+            wrap="word",
+            font=("Segoe UI", 10),
+            bg="#fafafa",
+            relief=tk.FLAT,
+            height=12,
+            state="disabled",
+        )
         self.detail_text.pack(fill=tk.BOTH, expand=True)
 
         # Підказка
-        hint = tk.Label(right, text="💡 Порада: додайте деталі, натисніть «РОЗКРИТИ»\n"
-                                    "і переглядайте кожен лист стрілками ◀ ▶",
-                        bg=self.colors["card"], fg="#666", font=("Segoe UI", 9), wraplength=240, justify="center")
+        hint = tk.Label(
+            right,
+            text="💡 Порада: додайте деталі, натисніть «РОЗКРИТИ»\n"
+            "і переглядайте кожен лист стрілками ◀ ▶",
+            bg=self.colors["card"],
+            fg="#666",
+            font=("Segoe UI", 9),
+            wraplength=240,
+            justify="center",
+        )
         hint.pack(fill=tk.X, padx=8, pady=8)
 
     # ═══════════════════════════════════════════════════════
@@ -396,16 +599,33 @@ class CamDuctEditorFrame(tk.Frame):
         self.size_entries = {}
 
         configs = {
-            "rect_duct": [("width", "Ширина", "400"), ("height", "Висота", "250"), ("length", "Довжина", "1000")],
+            "rect_duct": [
+                ("width", "Ширина", "400"),
+                ("height", "Висота", "250"),
+                ("length", "Довжина", "1000"),
+            ],
             "round_duct": [("diameter", "Діаметр", "250"), ("length", "Довжина", "1000")],
             "elbow": [("diameter", "Діаметр", "250"), ("angle", "Кут", "90")],
             "tee": [("diameter", "Діаметр", "250")],
-            "transition": [("d1", "Вхідний діам.", "250"), ("d2", "Вихідний діам.", "200"), ("length", "Довжина", "300")],
+            "transition": [
+                ("d1", "Вхідний діам.", "250"),
+                ("d2", "Вихідний діам.", "200"),
+                ("length", "Довжина", "300"),
+            ],
             "cap": [("diameter", "Діаметр", "250")],
-            "rect_elbow": [("width", "Ширина", "400"), ("height", "Висота", "250"), ("angle", "Кут", "90")],
+            "rect_elbow": [
+                ("width", "Ширина", "400"),
+                ("height", "Висота", "250"),
+                ("angle", "Кут", "90"),
+            ],
             "rect_tee": [("width", "Ширина", "400"), ("height", "Висота", "250")],
-            "rect_transition": [("w1", "Вхід. шир.", "400"), ("h1", "Вхід. вис.", "250"),
-                                ("w2", "Вихід. шир.", "300"), ("h2", "Вихід. вис.", "200"), ("length", "Довжина", "300")],
+            "rect_transition": [
+                ("w1", "Вхід. шир.", "400"),
+                ("h1", "Вхід. вис.", "250"),
+                ("w2", "Вихід. шир.", "300"),
+                ("h2", "Вихід. вис.", "200"),
+                ("length", "Довжина", "300"),
+            ],
             "grille": [("width", "Ширина", "300"), ("height", "Висота", "150")],
             "damper": [("diameter", "Діаметр", "250")],
         }
@@ -426,15 +646,23 @@ class CamDuctEditorFrame(tk.Frame):
         ptype = mapping.get(part_type, "rect_duct")
         fields = configs.get(ptype, [])
 
-        for i, (key, label, default) in enumerate(fields):
+        for _i, (key, label, default) in enumerate(fields):
             row = tk.Frame(self.size_container, bg=self.colors["card"])
             row.pack(fill=tk.X, pady=2)
-            tk.Label(row, text=f"{label}:", bg=self.colors["card"],
-                     font=("Segoe UI", 10), width=12, anchor="e").pack(side=tk.LEFT, padx=(0, 4))
+            tk.Label(
+                row,
+                text=f"{label}:",
+                bg=self.colors["card"],
+                font=("Segoe UI", 10),
+                width=12,
+                anchor="e",
+            ).pack(side=tk.LEFT, padx=(0, 4))
             e = tk.Entry(row, width=10, font=("Segoe UI", 10))
             e.insert(0, default)
             e.pack(side=tk.LEFT)
-            tk.Label(row, text="мм", bg=self.colors["card"], font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(4, 0))
+            tk.Label(row, text="мм", bg=self.colors["card"], font=("Segoe UI", 9)).pack(
+                side=tk.LEFT, padx=(4, 0)
+            )
             self.size_entries[key] = e
 
     def on_part_type_change(self, event=None):
@@ -460,17 +688,17 @@ class CamDuctEditorFrame(tk.Frame):
         if pt == "rect_duct":
             w = float(sizes.get("width", 400))
             h = float(sizes.get("height", 250))
-            l = float(sizes.get("length", 1000))
+            length = float(sizes.get("length", 1000))
             unfold_w = 2 * (w + h) + 6  # периметр + 6 мм на фальці
-            unfold_h = l
-            name = f"Прямокутник {int(w)}x{int(h)}x{int(l)}"
+            unfold_h = length
+            name = f"Прямокутник {int(w)}x{int(h)}x{int(length)}"
 
         elif pt == "round_duct":
             d = float(sizes.get("diameter", 250))
-            l = float(sizes.get("length", 1000))
+            length = float(sizes.get("length", 1000))
             unfold_w = math.pi * (d + 6)  # π*(d+6) — з урахуванням фальця
-            unfold_h = l
-            name = f"Круглий Ø{int(d)}x{int(l)}"
+            unfold_h = length
+            name = f"Круглий Ø{int(d)}x{int(length)}"
 
         elif pt == "elbow":
             d = float(sizes.get("diameter", 250))
@@ -489,9 +717,9 @@ class CamDuctEditorFrame(tk.Frame):
         elif pt == "transition":
             d1 = float(sizes.get("d1", 250))
             d2 = float(sizes.get("d2", 200))
-            l = float(sizes.get("length", 300))
+            length = float(sizes.get("length", 300))
             unfold_w = math.pi * ((d1 + d2) / 2 + 6)
-            unfold_h = l * 1.25
+            unfold_h = length * 1.25
             name = f"Перехід Ø{int(d1)}→Ø{int(d2)}"
 
         elif pt == "cap":
@@ -520,9 +748,9 @@ class CamDuctEditorFrame(tk.Frame):
             h1 = float(sizes.get("h1", 250))
             w2 = float(sizes.get("w2", 300))
             h2 = float(sizes.get("h2", 200))
-            l = float(sizes.get("length", 300))
+            length = float(sizes.get("length", 300))
             unfold_w = 2 * ((w1 + h1 + w2 + h2) / 2 + 6)
-            unfold_h = l * 1.3
+            unfold_h = length * 1.3
             name = f"Прям. перехід {int(w1)}x{int(h1)}→{int(w2)}x{int(h2)}"
 
         elif pt == "grille":
@@ -586,6 +814,7 @@ class CamDuctEditorFrame(tk.Frame):
         self.refresh_parts_tree()
         self.canvas.delete("all")
         self.reset_results()
+
     def import_calc_items(self, calc_items, clear_existing=True):
         """Імпортує деталі з DetailCalculatorFrame у список розкрою"""
         mapping = {
@@ -623,7 +852,6 @@ class CamDuctEditorFrame(tk.Frame):
         self.refresh_parts_tree()
         return added
 
-
     def refresh_parts_tree(self):
         print(f"[CamDuct] refresh_parts_tree called, parts count: {len(self.parts)}")
         for row in self.parts_tree.get_children():
@@ -632,13 +860,15 @@ class CamDuctEditorFrame(tk.Frame):
         for i, p in enumerate(self.parts, 1):
             area = p.area * p.quantity
             total_area += area
-            self.parts_tree.insert("", "end", values=(
-                i, p.name, f"{p.width:.0f}x{p.height:.0f}", p.quantity, f"{area:.3f}"
-            ))
+            self.parts_tree.insert(
+                "",
+                "end",
+                values=(i, p.name, f"{p.width:.0f}x{p.height:.0f}", p.quantity, f"{area:.3f}"),
+            )
             print(f"[CamDuct]   inserted row {i}: {p.name}")
         # Підсумок у статусі
         self.res_area.config(text=f"{total_area:.3f} м²")
-        print(f"[CamDuct] refresh done")
+        print("[CamDuct] refresh done")
 
     # ═══════════════════════════════════════════════════════
     #  РОЗКРІЙ (NESTING)
@@ -662,7 +892,9 @@ class CamDuctEditorFrame(tk.Frame):
         self.nesting = NestingEngine(sw, sh, kerf)
         sheets_needed = self.nesting.nest(self.parts)
         stats = self.nesting.get_stats()
-        print(f"[CamDuct] nesting done. sheets: {sheets_needed}, util: {stats['utilization_percent']}%")
+        print(
+            f"[CamDuct] nesting done. sheets: {sheets_needed}, util: {stats['utilization_percent']}%"
+        )
 
         self.res_sheets.config(text=str(sheets_needed))
         self.res_util.config(text=f"{stats['utilization_percent']}%")
@@ -678,7 +910,8 @@ class CamDuctEditorFrame(tk.Frame):
         # Детальний текст
         self.detail_text.config(state="normal")
         self.detail_text.delete("1.0", "end")
-        self.detail_text.insert("1.0",
+        self.detail_text.insert(
+            "1.0",
             f"Розмір листа: {sw} x {sh} мм\n"
             f"Площа одного листа: {stats['sheet_area_m2']:.3f} м²\n"
             f"Всього листів: {stats['sheets_count']}\n"
@@ -686,12 +919,14 @@ class CamDuctEditorFrame(tk.Frame):
             f"Площа деталей: {stats['total_parts_area_m2']:.3f} м²\n"
             f"Коеф. використання: {stats['utilization_percent']}%\n"
             f"Відходи: {stats['waste_percent']}%\n\n"
-            f"Розподіл по листах:\n"
+            f"Розподіл по листах:\n",
         )
         for i, sheet in enumerate(self.nesting.sheets):
             self.detail_text.insert("end", f"\nЛист {i+1}: {len(sheet)} деталей\n")
             for p in sheet:
-                self.detail_text.insert("end", f"  • {p.name} ({p.width:.0f}x{p.height:.0f}) @ ({p.x:.0f},{p.y:.0f})\n")
+                self.detail_text.insert(
+                    "end", f"  • {p.name} ({p.width:.0f}x{p.height:.0f}) @ ({p.x:.0f},{p.y:.0f})\n"
+                )
         self.detail_text.config(state="disabled")
 
         self.draw_nesting()
@@ -713,21 +948,41 @@ class CamDuctEditorFrame(tk.Frame):
         print("[CamDuct] _draw_placeholder called")
         self.canvas.delete("all")
         self.canvas.create_rectangle(50, 50, 250, 170, outline="#bdc3c7", fill="#ecf0f1", width=2)
-        self.canvas.create_text(150, 100, text="Область розкрою", font=("Segoe UI", 16, "bold"), fill="#7f8c8d")
-        self.canvas.create_text(150, 125, text="Додайте деталі → натисніть РОЗКРИТИ", font=("Segoe UI", 11), fill="#95a5a6")
+        self.canvas.create_text(
+            150, 100, text="Область розкрою", font=("Segoe UI", 16, "bold"), fill="#7f8c8d"
+        )
+        self.canvas.create_text(
+            150,
+            125,
+            text="Додайте деталі → натисніть РОЗКРИТИ",
+            font=("Segoe UI", 11),
+            fill="#95a5a6",
+        )
         self.canvas.config(scrollregion=(0, 0, 300, 200))
 
     def draw_nesting(self):
-        print(f"[CamDuct] draw_nesting called. nesting: {self.nesting is not None}, current_sheet: {self.current_sheet}")
+        print(
+            f"[CamDuct] draw_nesting called. nesting: {self.nesting is not None}, current_sheet: {self.current_sheet}"
+        )
         self.canvas.delete("all")
         self.scale = self.scale_var.get()
         self.scale_label.config(text=f"{self.scale:.2f} px/мм")
 
         if not self.nesting or not self.nesting.sheets:
             # Тестовий фон якщо немає розкрою
-            self.canvas.create_rectangle(50, 50, 200, 150, outline="#bdc3c7", fill="#ecf0f1", width=2)
-            self.canvas.create_text(125, 100, text="Область розкрою", font=("Segoe UI", 14), fill="#7f8c8d")
-            self.canvas.create_text(125, 120, text="Додайте деталі → натисніть РОЗКРИТИ", font=("Segoe UI", 10), fill="#95a5a6")
+            self.canvas.create_rectangle(
+                50, 50, 200, 150, outline="#bdc3c7", fill="#ecf0f1", width=2
+            )
+            self.canvas.create_text(
+                125, 100, text="Область розкрою", font=("Segoe UI", 14), fill="#7f8c8d"
+            )
+            self.canvas.create_text(
+                125,
+                120,
+                text="Додайте деталі → натисніть РОЗКРИТИ",
+                font=("Segoe UI", 10),
+                fill="#95a5a6",
+            )
             self.canvas.config(scrollregion=(0, 0, 300, 200))
             return
 
@@ -741,10 +996,12 @@ class CamDuctEditorFrame(tk.Frame):
         # Малюємо лист
         w_px = int(sw * s)
         h_px = int(sh * s)
-        self.canvas.create_rectangle(10, 10, 10 + w_px, 10 + h_px,
-                                     outline="#2c3e50", width=2, fill="#ecf0f1")
-        self.canvas.create_text(10 + w_px / 2, 5, text=f"{sw} x {sh} мм",
-                                font=("Segoe UI", 10, "bold"), fill="#2c3e50")
+        self.canvas.create_rectangle(
+            10, 10, 10 + w_px, 10 + h_px, outline="#2c3e50", width=2, fill="#ecf0f1"
+        )
+        self.canvas.create_text(
+            10 + w_px / 2, 5, text=f"{sw} x {sh} мм", font=("Segoe UI", 10, "bold"), fill="#2c3e50"
+        )
 
         # Сітка
         grid_step = 100  # мм
@@ -764,16 +1021,27 @@ class CamDuctEditorFrame(tk.Frame):
             self.canvas.create_rectangle(x1, y1, x2, y2, outline="black", width=1, fill=p.color)
             # Підпис
             if p.width * s > 40 and p.height * s > 20:
-                self.canvas.create_text((x1 + x2) / 2, (y1 + y2) / 2,
-                                        text=p.name[:12], font=("Segoe UI", 7),
-                                        fill="white")
+                self.canvas.create_text(
+                    (x1 + x2) / 2,
+                    (y1 + y2) / 2,
+                    text=p.name[:12],
+                    font=("Segoe UI", 7),
+                    fill="white",
+                )
             # Розміри
             if p.width * s > 60:
-                self.canvas.create_text((x1 + x2) / 2, y2 + 10,
-                                        text=f"{p.width:.0f}", font=("Segoe UI", 7), fill="#333")
+                self.canvas.create_text(
+                    (x1 + x2) / 2, y2 + 10, text=f"{p.width:.0f}", font=("Segoe UI", 7), fill="#333"
+                )
             if p.height * s > 40:
-                self.canvas.create_text(x2 + 12, (y1 + y2) / 2,
-                                        text=f"{p.height:.0f}", font=("Segoe UI", 7), fill="#333", angle=90)
+                self.canvas.create_text(
+                    x2 + 12,
+                    (y1 + y2) / 2,
+                    text=f"{p.height:.0f}",
+                    font=("Segoe UI", 7),
+                    fill="#333",
+                    angle=90,
+                )
 
         # Оновлюємо scrollregion
         self.canvas.config(scrollregion=(0, 0, 20 + w_px, 20 + h_px))
@@ -808,18 +1076,35 @@ class CamDuctEditorFrame(tk.Frame):
             "sheet_size": [self.nesting.sheet_w, self.nesting.sheet_h],
             "kerf": self.nesting.kerf,
             "stats": self.nesting.get_stats(),
-            "parts": [{"name": p.name, "type": p.part_type, "width": p.width,
-                       "height": p.height, "qty": p.quantity} for p in self.parts],
+            "parts": [
+                {
+                    "name": p.name,
+                    "type": p.part_type,
+                    "width": p.width,
+                    "height": p.height,
+                    "qty": p.quantity,
+                }
+                for p in self.parts
+            ],
             "sheets": [
-                [{"name": p.name, "x": p.x, "y": p.y, "w": p.width, "h": p.height, "color": p.color}
-                 for p in sheet]
+                [
+                    {
+                        "name": p.name,
+                        "x": p.x,
+                        "y": p.y,
+                        "w": p.width,
+                        "h": p.height,
+                        "color": p.color,
+                    }
+                    for p in sheet
+                ]
                 for sheet in self.nesting.sheets
-            ]
+            ],
         }
         filepath = filedialog.asksaveasfilename(
             defaultextension=".json",
             filetypes=[("JSON", "*.json")],
-            initialfile=f"nesting_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+            initialfile=f"nesting_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
         )
         if filepath:
             with open(filepath, "w", encoding="utf-8") as f:
@@ -833,21 +1118,34 @@ class CamDuctEditorFrame(tk.Frame):
         filepath = filedialog.asksaveasfilename(
             defaultextension=".csv",
             filetypes=[("CSV", "*.csv")],
-            initialfile=f"nesting_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+            initialfile=f"nesting_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
         )
         if not filepath:
             return
         import csv
+
         with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
             writer = csv.writer(f, delimiter=";")
             writer.writerow(["Лист", "Деталь", "Тип", "X", "Y", "Ширина", "Висота", "Площа м²"])
             for i, sheet in enumerate(self.nesting.sheets, 1):
                 for p in sheet:
-                    writer.writerow([i, p.name, p.part_type, p.x, p.y,
-                                     p.width, p.height, round(p.width * p.height / 1_000_000, 4)])
+                    writer.writerow(
+                        [
+                            i,
+                            p.name,
+                            p.part_type,
+                            p.x,
+                            p.y,
+                            p.width,
+                            p.height,
+                            round(p.width * p.height / 1_000_000, 4),
+                        ]
+                    )
             stats = self.nesting.get_stats()
             writer.writerow([])
             writer.writerow(["Статистика", "", "", "", "", "", "", ""])
             writer.writerow(["Листів", stats["sheets_count"], "", "", "", "", "", ""])
-            writer.writerow(["Використання %", stats["utilization_percent"], "", "", "", "", "", ""])
+            writer.writerow(
+                ["Використання %", stats["utilization_percent"], "", "", "", "", "", ""]
+            )
         messagebox.showinfo("Готово", f"CSV експортовано:\n{filepath}")

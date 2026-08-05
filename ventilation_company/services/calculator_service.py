@@ -2,12 +2,11 @@
 Сервіс розрахунків виробів вентиляції
 Бізнес-логіка без GUI
 """
-from typing import List, Dict, Any, Optional, Tuple
+
 from math import pi
-from ventilation_company.database.repositories.product_repo import ProductRepo
-from ventilation_company.database.repositories.material_repo import MaterialRepo
+from typing import Any
+
 from ventilation_company.database.repositories.calc_repo import CalcRepo
-from ventilation_company.database.repositories.overhead_repo import OverheadRepo
 from ventilation_company.database.repositories.settings_repo import SettingsRepo
 
 
@@ -15,7 +14,7 @@ class CalculatorService:
     """Сервіс для розрахунку вартості виробів вентиляції."""
 
     @staticmethod
-    def calculate_area(formula: str, params: Dict[str, float], waste_factor: float = 1.0) -> float:
+    def calculate_area(formula: str, params: dict[str, float], waste_factor: float = 1.0) -> float:
         """Обчислює площу за формулою."""
         expr = formula.replace("pi", str(pi)).replace("π", str(pi))
         for key, val in params.items():
@@ -27,17 +26,19 @@ class CalculatorService:
             return 0.0
 
     @staticmethod
-    def calculate_item_cost(area: float, material_price_per_m2: float,
-                           labor_rate: float, labor_mode: str = "m2",
-                           labor_norm: float = 0.0, quantity: int = 1,
-                           overhead_percent: float = 15.0) -> Dict[str, float]:
+    def calculate_item_cost(
+        area: float,
+        material_price_per_m2: float,
+        labor_rate: float,
+        labor_mode: str = "m2",
+        labor_norm: float = 0.0,
+        quantity: int = 1,
+        overhead_percent: float = 15.0,
+    ) -> dict[str, float]:
         """Розраховує собівартість однієї позиції."""
         material_cost = area * material_price_per_m2
 
-        if labor_mode == "m2":
-            labor_cost = area * labor_rate
-        else:
-            labor_cost = labor_norm * labor_rate
+        labor_cost = area * labor_rate if labor_mode == "m2" else labor_norm * labor_rate
 
         overhead_cost = (material_cost + labor_cost) * (overhead_percent / 100)
         total_cost = material_cost + labor_cost + overhead_cost
@@ -55,8 +56,9 @@ class CalculatorService:
         return total_cost * (1 + markup_percent / 100)
 
     @staticmethod
-    def apply_group_discount(unit_price: float, total_qty: int,
-                              discount_table: Dict[int, float]) -> float:
+    def apply_group_discount(
+        unit_price: float, total_qty: int, discount_table: dict[int, float]
+    ) -> float:
         """Застосовує групову знижку за кількістю."""
         discount = 0.0
         for threshold, pct in sorted(discount_table.items(), key=lambda x: int(x[0])):
@@ -97,7 +99,7 @@ class CalculatorService:
         return SettingsRepo.get_int("monthly_production_qty", 100)
 
     @staticmethod
-    def get_calculation_summary(calc_id: int) -> Optional[Dict[str, Any]]:
+    def get_calculation_summary(calc_id: int) -> dict[str, Any] | None:
         """Повертає підсумок розрахунку."""
         calc = CalcRepo.get_calculation_by_id(calc_id)
         if not calc:
@@ -116,7 +118,7 @@ class CalculatorService:
         }
 
     @staticmethod
-    def compare_calculations(calc_ids: List[int]) -> List[Dict[str, Any]]:
+    def compare_calculations(calc_ids: list[int]) -> list[dict[str, Any]]:
         """Порівнює кілька розрахунків."""
         results = []
         for cid in calc_ids:

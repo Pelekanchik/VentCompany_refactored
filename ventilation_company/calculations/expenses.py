@@ -1,7 +1,7 @@
 """
 Модуль обліку витрат виробництва
 """
-from ventilation_company.database import execute_query
+
 from datetime import datetime
 
 
@@ -14,7 +14,7 @@ class ExpenseTracker:
         "amortyzacija",
         "transport",
         "orenda",
-        "inshi"
+        "inshi",
     ]
 
     def __init__(self):
@@ -29,7 +29,7 @@ class ExpenseTracker:
             "amount": float(amount),
             "description": description,
             "project_id": project_id,
-            "date": date or datetime.now().isoformat()
+            "date": date or datetime.now().isoformat(),
         }
         self.expenses.append(expense)
         print(f"  Vytrata dodano: {category} - {amount:.2f} hrn")
@@ -53,7 +53,9 @@ class ExpenseTracker:
         print("OBLIK VYTRAT".center(70))
         print("=" * 70)
         for expense in self.expenses:
-            print(f"  {expense['date'][:10]} | {expense['category']:<25} | {expense['amount']:>10.2f} hrn | {expense['description']}")
+            print(
+                f"  {expense['date'][:10]} | {expense['category']:<25} | {expense['amount']:>10.2f} hrn | {expense['description']}"
+            )
         print("-" * 70)
         summary = self.get_summary_by_categories()
         for cat, total in summary.items():
@@ -78,7 +80,7 @@ class ExpenseTracker:
             "month": month,
             "expenses": monthly_expenses,
             "summary": summary,
-            "total": round(sum(summary.values()), 2)
+            "total": round(sum(summary.values()), 2),
         }
 
 
@@ -92,6 +94,7 @@ class ProductionCostAnalyzer:
         works_cost = sum(w["total_price"] for w in self.project._works)
         direct_costs = materials_cost + components_cost
         from config import OVERHEAD_PERCENTAGE
+
         overhead = direct_costs * (OVERHEAD_PERCENTAGE / 100)
         production_cost = direct_costs + overhead + works_cost * 0.6
         installation_cost = works_cost * 0.4
@@ -103,7 +106,7 @@ class ProductionCostAnalyzer:
             "overhead": round(overhead, 2),
             "production_cost": round(production_cost, 2),
             "installation_cost": round(installation_cost, 2),
-            "total_cost": round(production_cost + installation_cost, 2)
+            "total_cost": round(production_cost + installation_cost, 2),
         }
 
     def print_analysis(self):

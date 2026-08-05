@@ -1,9 +1,11 @@
 """
 Модуль формування специфікацій проекту
 """
-from datetime import datetime
-from ventilation_company.config import PROJECTS_DIR
+
 import os
+from datetime import datetime
+
+from ventilation_company.config import PROJECTS_DIR
 
 
 class SpecificationBuilder:
@@ -17,7 +19,7 @@ class SpecificationBuilder:
             "materials": self._build_materials_section(),
             "components": self._build_components_section(),
             "works": self._build_works_section(),
-            "totals": self._calculate_totals()
+            "totals": self._calculate_totals(),
         }
         self.specification = spec
         return spec
@@ -32,46 +34,52 @@ class SpecificationBuilder:
             "air_flow": self.project.air_flow,
             "pressure": self.project.pressure,
             "date": datetime.now().strftime("%d.%m.%Y"),
-            "status": self.project.status
+            "status": self.project.status,
         }
 
     def _build_materials_section(self):
         materials = []
         for mat in self.project._materials:
-            materials.append({
-                "num": len(materials) + 1,
-                "name": mat["name"],
-                "qty": mat["quantity"],
-                "unit": mat["unit"],
-                "price": mat["unit_price"],
-                "total": mat["total_price"]
-            })
+            materials.append(
+                {
+                    "num": len(materials) + 1,
+                    "name": mat["name"],
+                    "qty": mat["quantity"],
+                    "unit": mat["unit"],
+                    "price": mat["unit_price"],
+                    "total": mat["total_price"],
+                }
+            )
         return materials
 
     def _build_components_section(self):
         components = []
         for comp in self.project._components:
-            components.append({
-                "num": len(components) + 1,
-                "name": comp["name"],
-                "qty": comp["quantity"],
-                "unit": comp["unit"],
-                "price": comp["unit_price"],
-                "total": comp["total_price"]
-            })
+            components.append(
+                {
+                    "num": len(components) + 1,
+                    "name": comp["name"],
+                    "qty": comp["quantity"],
+                    "unit": comp["unit"],
+                    "price": comp["unit_price"],
+                    "total": comp["total_price"],
+                }
+            )
         return components
 
     def _build_works_section(self):
         works = []
         for work in self.project._works:
-            works.append({
-                "num": len(works) + 1,
-                "name": work["name"],
-                "qty": work["quantity"],
-                "unit": work["unit"],
-                "price": work["unit_price"],
-                "total": work["total_price"]
-            })
+            works.append(
+                {
+                    "num": len(works) + 1,
+                    "name": work["name"],
+                    "qty": work["quantity"],
+                    "unit": work["unit"],
+                    "price": work["unit_price"],
+                    "total": work["total_price"],
+                }
+            )
         return works
 
     def _calculate_totals(self):
@@ -82,7 +90,7 @@ class SpecificationBuilder:
             "materials_total": round(materials_total, 2),
             "components_total": round(components_total, 2),
             "works_total": round(works_total, 2),
-            "grand_total": round(materials_total + components_total + works_total, 2)
+            "grand_total": round(materials_total + components_total + works_total, 2),
         }
 
     def print_specification(self):
@@ -102,17 +110,23 @@ class SpecificationBuilder:
             print("\nMATERIALY".center(80))
             print("-" * 80)
             for item in spec["materials"]:
-                print(f"  {item['num']}. {item['name']} - {item['qty']} {item['unit']} x {item['price']} = {item['total']} hrn")
+                print(
+                    f"  {item['num']}. {item['name']} - {item['qty']} {item['unit']} x {item['price']} = {item['total']} hrn"
+                )
         if spec["components"]:
             print("\nKOMPLEKTUUCHI".center(80))
             print("-" * 80)
             for item in spec["components"]:
-                print(f"  {item['num']}. {item['name']} - {item['qty']} {item['unit']} x {item['price']} = {item['total']} hrn")
+                print(
+                    f"  {item['num']}. {item['name']} - {item['qty']} {item['unit']} x {item['price']} = {item['total']} hrn"
+                )
         if spec["works"]:
             print("\nROBOTY".center(80))
             print("-" * 80)
             for item in spec["works"]:
-                print(f"  {item['num']}. {item['name']} - {item['qty']} {item['unit']} x {item['price']} = {item['total']} hrn")
+                print(
+                    f"  {item['num']}. {item['name']} - {item['qty']} {item['unit']} x {item['price']} = {item['total']} hrn"
+                )
         totals = spec["totals"]
         print("\n" + "=" * 80)
         print("PIDSUMKY".center(80))
@@ -140,15 +154,19 @@ class SpecificationBuilder:
         lines.append(f"Vytrata povitria: {header['air_flow']} m3/hod")
         lines.append(f"Data: {header['date']}")
         lines.append("=" * 80)
-        for section_name, section_data in [("MATERIALY", spec["materials"]),
-                                              ("KOMPLEKTUUCHI", spec["components"]),
-                                              ("ROBOTY", spec["works"])]:
+        for section_name, section_data in [
+            ("MATERIALY", spec["materials"]),
+            ("KOMPLEKTUUCHI", spec["components"]),
+            ("ROBOTY", spec["works"]),
+        ]:
             if section_data:
                 lines.append("")
                 lines.append(section_name.center(80))
                 lines.append("-" * 80)
                 for item in section_data:
-                    lines.append(f"{item['num']}. {item['name']} - {item['qty']} {item['unit']} x {item['price']} = {item['total']} hrn")
+                    lines.append(
+                        f"{item['num']}. {item['name']} - {item['qty']} {item['unit']} x {item['price']} = {item['total']} hrn"
+                    )
                 lines.append("-" * 80)
         lines.append("")
         lines.append(f"VSOHO: {spec['totals']['grand_total']:.2f} hrn")

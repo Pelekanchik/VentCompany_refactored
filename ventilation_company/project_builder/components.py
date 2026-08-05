@@ -1,7 +1,8 @@
 """
 Модуль компонентів вентиляційної системи
 """
-from ventilation_company.config import MATERIALS, COMPONENTS, WORKS
+
+from ventilation_company.config import COMPONENTS, MATERIALS, WORKS
 
 
 class ComponentCatalog:
@@ -75,7 +76,7 @@ class ComponentCatalog:
 class DuctCalculator:
     @staticmethod
     def calculate_rectangular_duct(width_mm, height_mm, length_m, material="оцинкована_сталь_0.7"):
-        import math
+
         width_m = width_mm / 1000
         height_m = height_mm / 1000
         perimeter = 2 * (width_m + height_m)
@@ -96,12 +97,13 @@ class DuctCalculator:
             "material_cost": round(material_cost, 2),
             "manufacturing_cost": round(work_cost, 2),
             "installation_cost": round(install_cost, 2),
-            "total_cost": round(material_cost + work_cost + install_cost, 2)
+            "total_cost": round(material_cost + work_cost + install_cost, 2),
         }
 
     @staticmethod
     def calculate_round_duct(diameter_mm, length_m, material="оцинкована_сталь_0.7"):
         import math
+
         diameter_m = diameter_mm / 1000
         area = math.pi * diameter_m * length_m
         material_price = ComponentCatalog.get_material_price(material)
@@ -119,12 +121,13 @@ class DuctCalculator:
             "material_cost": round(material_cost, 2),
             "manufacturing_cost": round(work_cost, 2),
             "installation_cost": round(install_cost, 2),
-            "total_cost": round(material_cost + work_cost + install_cost, 2)
+            "total_cost": round(material_cost + work_cost + install_cost, 2),
         }
 
     @staticmethod
     def calculate_air_velocity(air_flow_m3h, diameter_mm):
         import math
+
         diameter_m = diameter_mm / 1000
         area = math.pi * (diameter_m / 2) ** 2
         velocity = (air_flow_m3h / 3600) / area
@@ -141,6 +144,7 @@ class DuctCalculator:
     @staticmethod
     def recommend_duct_size(air_flow_m3h, max_velocity_ms=8, shape="round"):
         import math
+
         flow_m3s = air_flow_m3h / 3600
         required_area = flow_m3s / max_velocity_ms
         if shape == "round":

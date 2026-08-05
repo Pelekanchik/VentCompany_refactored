@@ -1,51 +1,53 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Модуль детального калькулятора виробів вентиляції.
 Інтегрується у вкладку "Вироби" головного GUI.
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
 import json
 import os
-import tempfile
+import tkinter as tk
 import webbrowser
-import csv
-from math import pi
-from datetime import datetime, timedelta
 from calendar import monthrange
-# ── Імпорти сервісів та репозиторіїв ──
-from ventilation_company.services.calculator_service import CalculatorService
-from ventilation_company.services.template_service import TemplateService
-from ventilation_company.services.export_service import ExportService
-from ventilation_company.database.repositories.product_repo import ProductRepo
-from ventilation_company.database.repositories.material_repo import MaterialRepo
-from ventilation_company.database.repositories.calc_repo import CalcRepo
-from ventilation_company.database.repositories.overhead_repo import OverheadRepo
-from ventilation_company.database.repositories.template_repo import TemplateRepo
-from ventilation_company.database.repositories.settings_repo import SettingsRepo
+from datetime import datetime
+from tkinter import messagebox, ttk
 
+from ventilation_company.database.repositories.calc_repo import CalcRepo
+from ventilation_company.database.repositories.material_repo import MaterialRepo
+from ventilation_company.database.repositories.overhead_repo import OverheadRepo
+from ventilation_company.database.repositories.product_repo import ProductRepo
+from ventilation_company.database.repositories.settings_repo import SettingsRepo
+from ventilation_company.database.repositories.template_repo import TemplateRepo
+
+# ── Імпорти сервісів та репозиторіїв ──
+from ventilation_company.services.export_service import ExportService
 
 try:
-    import openpyxl
-    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    pass
+
     HAS_OPENPYXL = True
 except ImportError:
     HAS_OPENPYXL = False
 
-from ventilation_company.database import get_calc_db, calculate_area, get_size_labels, format_size_params
+import contextlib
 
+from ventilation_company.database import (
+    calculate_area,
+    format_size_params,
+    get_calc_db,
+    get_size_labels,
+)
 
 # ── D: Кеш БД ──
 _db_cache = {"conn": None, "time": 0}
+
 
 def _invalidate_db_cache():
     """Скидає кеш БД після запису."""
     global _db_cache
     if _db_cache["conn"]:
-        try: _db_cache["conn"].close()
-        except: pass
+        with contextlib.suppress(BaseException):
+            _db_cache["conn"].close()
     _db_cache["conn"] = None
     _db_cache["time"] = 0
 
@@ -55,8 +57,14 @@ class DetailCalculatorFrame(tk.Frame):
 
     def __init__(self, parent, colors=None, **kwargs):
         super().__init__(parent, **kwargs)
-        self.colors = colors or {"bg": "#f0f0f0", "fg": "#333333", "accent": "#3498db",
-                                 "card": "white", "sidebar": "#2c3e50", "sidebar_fg": "white"}
+        self.colors = colors or {
+            "bg": "#f0f0f0",
+            "fg": "#333333",
+            "accent": "#3498db",
+            "card": "white",
+            "sidebar": "#2c3e50",
+            "sidebar_fg": "white",
+        }
         self.configure(bg=self.colors["bg"])
 
         self.calc_items = []
@@ -68,9 +76,15 @@ class DetailCalculatorFrame(tk.Frame):
         self.style.configure("DC.TFrame", background=self.colors["bg"])
         self.style.configure("DC.TLabel", background=self.colors["bg"], font=("Segoe UI", 11))
         self.style.configure("DC.TButton", font=("Segoe UI", 11), padding=6)
-        self.style.configure("DC.Title.TLabel", font=("Segoe UI", 14, "bold"), background=self.colors["bg"])
+        self.style.configure(
+            "DC.Title.TLabel", font=("Segoe UI", 14, "bold"), background=self.colors["bg"]
+        )
         self.style.configure("DC.Card.TLabelframe", background=self.colors["card"], borderwidth=1)
-        self.style.configure("DC.Card.TLabelframe.Label", font=("Segoe UI", 12, "bold"), background=self.colors["card"])
+        self.style.configure(
+            "DC.Card.TLabelframe.Label",
+            font=("Segoe UI", 12, "bold"),
+            background=self.colors["card"],
+        )
         self.style.configure("DC.Treeview", font=("Segoe UI", 11), rowheight=28)
         self.style.configure("DC.Treeview.Heading", font=("Segoe UI", 11, "bold"))
 
@@ -111,7 +125,7 @@ class DetailCalculatorFrame(tk.Frame):
         tab = self.notebook.tab(self.notebook.select(), "text")
         if "Калькулятор" in tab:
             self.load_calc_data()
-            if hasattr(self, 'calc_subtype') and self.calc_subtype.get():
+            if hasattr(self, "calc_subtype") and self.calc_subtype.get():
                 self.on_calc_subtype_change()
         elif "Типи" in tab:
             self.load_types_data()
@@ -183,32 +197,55 @@ class DetailCalculatorFrame(tk.Frame):
         # ── Toolbar ──
         toolbar = ttk.Frame(self.calc_frame, style="DC.TFrame")
         toolbar.pack(fill="x", padx=10, pady=(5, 0))
-        ttk.Button(toolbar, text="🧮 Розрахувати", command=self.calculate_all).pack(side="left", padx=3)
-        ttk.Button(toolbar, text="🧹 Очистити", command=self.clear_calc_items).pack(side="left", padx=3)
-        ttk.Button(toolbar, text="📤 Експорт в прайс-лист", command=self.export_to_price_list).pack(side="left", padx=3)
-        ttk.Button(toolbar, text="📄 Шаблони", command=lambda: self.notebook.select(self.templates_frame)).pack(side="left", padx=3)
-        ttk.Button(toolbar, text="💸 Групова знижка", command=self.apply_group_discount_dialog).pack(side="left", padx=3)
-        ttk.Button(toolbar, text="📊 Порівняти КП", command=self.compare_calculations_dialog).pack(side="left", padx=3)
-        ttk.Button(toolbar, text="📊 Excel", command=self.export_current_xlsx).pack(side="left", padx=3)
+        ttk.Button(toolbar, text="🧮 Розрахувати", command=self.calculate_all).pack(
+            side="left", padx=3
+        )
+        ttk.Button(toolbar, text="🧹 Очистити", command=self.clear_calc_items).pack(
+            side="left", padx=3
+        )
+        ttk.Button(toolbar, text="📤 Експорт в прайс-лист", command=self.export_to_price_list).pack(
+            side="left", padx=3
+        )
+        ttk.Button(
+            toolbar, text="📄 Шаблони", command=lambda: self.notebook.select(self.templates_frame)
+        ).pack(side="left", padx=3)
+        ttk.Button(
+            toolbar, text="💸 Групова знижка", command=self.apply_group_discount_dialog
+        ).pack(side="left", padx=3)
+        ttk.Button(toolbar, text="📊 Порівняти КП", command=self.compare_calculations_dialog).pack(
+            side="left", padx=3
+        )
+        ttk.Button(toolbar, text="📊 Excel", command=self.export_current_xlsx).pack(
+            side="left", padx=3
+        )
         ttk.Button(toolbar, text="🖨️ Друк", command=self.print_current).pack(side="left", padx=3)
 
         left = ttk.Frame(self.calc_frame, style="DC.TFrame")
         left.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
-        params_frame = ttk.LabelFrame(left, text="Параметри розрахунку", padding=15, style="DC.Card.TLabelframe")
+        params_frame = ttk.LabelFrame(
+            left, text="Параметри розрахунку", padding=15, style="DC.Card.TLabelframe"
+        )
         params_frame.pack(fill="x", pady=(0, 10))
 
         ttk.Label(params_frame, text="Клієнт:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.calc_client = ttk.Entry(params_frame, width=30)
         self.calc_client.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
 
-        ttk.Label(params_frame, text="Націнка (%):").grid(row=0, column=2, sticky="w", padx=5, pady=5)
+        ttk.Label(params_frame, text="Націнка (%):").grid(
+            row=0, column=2, sticky="w", padx=5, pady=5
+        )
         self.calc_markup = ttk.Entry(params_frame, width=10)
         self.calc_markup.insert(0, "30")
         self.calc_markup.grid(row=0, column=3, padx=5, pady=5)
 
         ttk.Label(params_frame, text="Режим:").grid(row=0, column=4, sticky="w", padx=5, pady=5)
-        self.calc_labor_mode = ttk.Combobox(params_frame, values=["За годину (грн/год)", "За м² (грн/м²)"], state="readonly", width=18)
+        self.calc_labor_mode = ttk.Combobox(
+            params_frame,
+            values=["За годину (грн/год)", "За м² (грн/м²)"],
+            state="readonly",
+            width=18,
+        )
         self.calc_labor_mode.current(0)
         self.calc_labor_mode.grid(row=0, column=5, padx=5, pady=5)
         self.calc_labor_mode.bind("<<ComboboxSelected>>", self.on_labor_mode_change)
@@ -222,14 +259,17 @@ class DetailCalculatorFrame(tk.Frame):
             params_frame.columnconfigure(col, weight=1)
 
         # Кнопка збереження налаштувань
-        ttk.Button(params_frame, text="💾 Зберегти налаштування", command=self.save_calc_settings).grid(
-            row=1, column=2, columnspan=4, padx=5, pady=5, sticky="e")
+        ttk.Button(
+            params_frame, text="💾 Зберегти налаштування", command=self.save_calc_settings
+        ).grid(row=1, column=2, columnspan=4, padx=5, pady=5, sticky="e")
 
         # Завантажуємо збережені налаштування
         self._init_calc_settings_db()
         self.load_calc_settings()
 
-        item_frame = ttk.LabelFrame(left, text="Додати виріб", padding=15, style="DC.Card.TLabelframe")
+        item_frame = ttk.LabelFrame(
+            left, text="Додати виріб", padding=15, style="DC.Card.TLabelframe"
+        )
         item_frame.pack(fill="x", pady=(0, 10))
 
         ttk.Label(item_frame, text="Тип виробу:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
@@ -252,10 +292,13 @@ class DetailCalculatorFrame(tk.Frame):
         self.calc_qty.grid(row=1, column=3, padx=5, pady=5)
 
         self.has_flange = tk.BooleanVar(value=False)
-        self.flange_check = ttk.Checkbutton(item_frame, text="З фланцем", variable=self.has_flange,
-                                            command=self.on_flange_toggle)
+        self.flange_check = ttk.Checkbutton(
+            item_frame, text="З фланцем", variable=self.has_flange, command=self.on_flange_toggle
+        )
         self.flange_check.grid(row=1, column=4, padx=(15, 2), pady=5)
-        ttk.Label(item_frame, text="К-ть фланців:").grid(row=1, column=5, sticky="w", padx=(2, 2), pady=5)
+        ttk.Label(item_frame, text="К-ть фланців:").grid(
+            row=1, column=5, sticky="w", padx=(2, 2), pady=5
+        )
         self.flange_qty_entry = ttk.Entry(item_frame, width=6)
         self.flange_qty_entry.insert(0, "1")
         self.flange_qty_entry.grid(row=1, column=6, padx=5, pady=5)
@@ -269,16 +312,29 @@ class DetailCalculatorFrame(tk.Frame):
         self.size_frame.grid(row=2, column=0, columnspan=7, sticky="ew", pady=10)
         self.size_widgets = {}
 
-        ttk.Button(item_frame, text="➕ Додати виріб до списку", command=self.add_item_to_calc).grid(
-            row=3, column=0, columnspan=7, pady=10, sticky="ew")
+        ttk.Button(
+            item_frame, text="➕ Додати виріб до списку", command=self.add_item_to_calc
+        ).grid(row=3, column=0, columnspan=7, pady=10, sticky="ew")
 
-        list_frame = ttk.LabelFrame(left, text="Список виробів", padding=10, style="DC.Card.TLabelframe")
+        list_frame = ttk.LabelFrame(
+            left, text="Список виробів", padding=10, style="DC.Card.TLabelframe"
+        )
         list_frame.pack(fill="both", expand=True, pady=(0, 10))
 
         columns = ("№", "Виріб", "Матеріал", "Розміри", "К-ть", "Площа", "Ціна", "Сума")
-        self.calc_tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=8, style="DC.Treeview")
-        col_widths = {"№": 40, "Виріб": 140, "Матеріал": 140, "Розміри": 120,
-                      "К-ть": 50, "Площа": 80, "Ціна": 90, "Сума": 90}
+        self.calc_tree = ttk.Treeview(
+            list_frame, columns=columns, show="headings", height=8, style="DC.Treeview"
+        )
+        col_widths = {
+            "№": 40,
+            "Виріб": 140,
+            "Матеріал": 140,
+            "Розміри": 120,
+            "К-ть": 50,
+            "Площа": 80,
+            "Ціна": 90,
+            "Сума": 90,
+        }
         for col in columns:
             self.calc_tree.heading(col, text=col)
             self.calc_tree.column(col, width=col_widths.get(col, 80), anchor="center", stretch=True)
@@ -291,13 +347,17 @@ class DetailCalculatorFrame(tk.Frame):
         vsb.pack(side="right", fill="y")
         hsb.pack(side="bottom", fill="x")
 
-        ttk.Button(list_frame, text="🗑 Видалити вибраний", command=self.remove_calc_item).pack(fill="x", pady=(5,0))
+        ttk.Button(list_frame, text="🗑 Видалити вибраний", command=self.remove_calc_item).pack(
+            fill="x", pady=(5, 0)
+        )
 
         right = ttk.Frame(self.calc_frame, width=300)
         right.pack(side="right", fill="y", padx=10, pady=10)
         right.pack_propagate(False)
 
-        result_frame = ttk.LabelFrame(right, text="Результат", padding=15, style="DC.Card.TLabelframe")
+        result_frame = ttk.LabelFrame(
+            right, text="Результат", padding=15, style="DC.Card.TLabelframe"
+        )
         result_frame.pack(fill="both", expand=True)
 
         self.res_cost = ttk.Label(result_frame, text="—", font=("Segoe UI", 20, "bold"))
@@ -306,7 +366,9 @@ class DetailCalculatorFrame(tk.Frame):
 
         ttk.Separator(result_frame, orient="horizontal").pack(fill="x", pady=10)
 
-        self.res_sale = ttk.Label(result_frame, text="—", font=("Segoe UI", 20, "bold"), foreground="#16a34a")
+        self.res_sale = ttk.Label(
+            result_frame, text="—", font=("Segoe UI", 20, "bold"), foreground="#16a34a"
+        )
         self.res_sale.pack(pady=10)
         ttk.Label(result_frame, text="Ціна продажу", foreground="#666").pack()
 
@@ -316,21 +378,28 @@ class DetailCalculatorFrame(tk.Frame):
         self.res_profit.pack(pady=10)
         ttk.Label(result_frame, text="Прибуток", foreground="#666").pack()
 
-        self.res_detail = tk.Text(result_frame, height=12, wrap="word", font=("Segoe UI", 10),
-                                   bg="#fafafa", relief="flat", state="disabled")
+        self.res_detail = tk.Text(
+            result_frame,
+            height=12,
+            wrap="word",
+            font=("Segoe UI", 10),
+            bg="#fafafa",
+            relief="flat",
+            state="disabled",
+        )
         self.res_detail.pack(fill="both", expand=True, pady=10)
 
-        self.discount_info = ttk.Label(result_frame, text="", font=("Segoe UI", 9), foreground="#666")
+        self.discount_info = ttk.Label(
+            result_frame, text="", font=("Segoe UI", 9), foreground="#666"
+        )
         self.discount_info.pack(pady=(0, 5))
-
-
 
         self.load_calc_data()
 
     def load_calc_data(self):
         types = ProductRepo.get_all_types()
         self.product_types = [dict(t) for t in types]
-        if hasattr(self, 'calc_type'):
+        if hasattr(self, "calc_type"):
             self.calc_type["values"] = [t["name"] for t in self.product_types]
 
         subtypes = ProductRepo.get_all_subtypes()
@@ -356,7 +425,9 @@ class DetailCalculatorFrame(tk.Frame):
 
         mats = MaterialRepo.get_materials_by_subtype(subtype["id"])
         mat_list = [dict(m) for m in mats]
-        self.calc_material["values"] = [f"{m['name']} {m['thickness']} мм — {m['price_per_m2']} грн/м²" for m in mat_list]
+        self.calc_material["values"] = [
+            f"{m['name']} {m['thickness']} мм — {m['price_per_m2']} грн/м²" for m in mat_list
+        ]
         self.calc_material.mat_data = mat_list
         if mat_list:
             self.calc_material.current(0)
@@ -392,12 +463,12 @@ class DetailCalculatorFrame(tk.Frame):
                 values = json.loads(sz["values_json"])
                 combo = ttk.Combobox(self.size_frame, values=values, width=12, state="readonly")
                 combo.current(0)
-                combo.grid(row=row, column=col+1, padx=5, pady=5, sticky="ew")
+                combo.grid(row=row, column=col + 1, padx=5, pady=5, sticky="ew")
                 self.size_widgets[sz["param_name"]] = ("combo", combo)
             else:
                 entry = ttk.Entry(self.size_frame, width=12)
                 entry.insert(0, str(int(sz["min_value"])) if sz["min_value"] else "100")
-                entry.grid(row=row, column=col+1, padx=5, pady=5, sticky="ew")
+                entry.grid(row=row, column=col + 1, padx=5, pady=5, sticky="ew")
                 self.size_widgets[sz["param_name"]] = ("entry", entry)
 
         # Налаштування колонок
@@ -414,7 +485,11 @@ class DetailCalculatorFrame(tk.Frame):
             return
 
         subtype = next((s for s in self.all_subtypes if s["name"] == subtype_name), None)
-        mat = self.calc_material.mat_data[self.calc_material.current()] if hasattr(self.calc_material, 'mat_data') else None
+        mat = (
+            self.calc_material.mat_data[self.calc_material.current()]
+            if hasattr(self.calc_material, "mat_data")
+            else None
+        )
 
         if not subtype or not mat:
             return
@@ -462,12 +537,22 @@ class DetailCalculatorFrame(tk.Frame):
             if item.get("has_flange"):
                 sizes += f" | Фланців: {item['flange_qty']} (П={item['flange_perimeter']:.2f}м)"
             # Показуємо ціну та суму, якщо вже розраховані
-            price = f"{item['unit_price']:.2f}" if item.get('unit_price') is not None else "—"
-            total = f"{item['total_price']:.2f}" if item.get('total_price') is not None else "—"
-            self.calc_tree.insert("", "end", values=(
-                i, item["subtype_name"], item["material_name"], sizes,
-                item["quantity"], f"{item['area']:.3f}", price, total
-            ))
+            price = f"{item['unit_price']:.2f}" if item.get("unit_price") is not None else "—"
+            total = f"{item['total_price']:.2f}" if item.get("total_price") is not None else "—"
+            self.calc_tree.insert(
+                "",
+                "end",
+                values=(
+                    i,
+                    item["subtype_name"],
+                    item["material_name"],
+                    sizes,
+                    item["quantity"],
+                    f"{item['area']:.3f}",
+                    price,
+                    total,
+                ),
+            )
 
     def remove_calc_item(self):
         selected = self.calc_tree.selection()
@@ -490,8 +575,8 @@ class DetailCalculatorFrame(tk.Frame):
         monthly_qty = SettingsRepo.get_int("monthly_products", 100)
         flange_profile_price = SettingsRepo.get_float("flange_profile_price", 0)
         flange_corner_price = SettingsRepo.get_float("flange_corner_price", 0)
+        SettingsRepo.get_float("flange_waste_factor", 1.0)
         flange_waste_factor = SettingsRepo.get_float("flange_waste_factor", 1.0)
-
         # Значення вже отримано через SettingsRepo вище
 
         # Групова знижка
@@ -506,7 +591,11 @@ class DetailCalculatorFrame(tk.Frame):
 
             flange_cost = 0
             if item.get("has_flange") and item.get("flange_perimeter", 0) > 0:
-                flange_mat_cost = item["flange_perimeter"] * (flange_profile_price + flange_corner_price) * flange_waste
+                flange_mat_cost = (
+                    item["flange_perimeter"]
+                    * (flange_profile_price + flange_corner_price)
+                    * flange_waste_factor
+                )
                 flange_cost = flange_mat_cost * item["flange_qty"]
 
             if labor_mode == "m2":
@@ -540,29 +629,43 @@ class DetailCalculatorFrame(tk.Frame):
         calc_id = CalcRepo.add_calculation(
             client_name=self.calc_client.get(),
             markup_percent=markup,
-            overhead_percent=float(SettingsRepo().get("overhead_percent", 15))
+            overhead_percent=float(SettingsRepo().get("overhead_percent", 15)),
         )
         CalcRepo.update_calculation_full(calc_id, total_cost=total_cost, sale_price=total_sale)
 
         db = get_calc_db()
         for item in self.calc_items:
-            db.execute("""
+            db.execute(
+                """
                 INSERT INTO calc_items
                 (calculation_id, subtype_id, material_id, size_params, quantity, area_m2,
                  material_cost, flange_cost, labor_cost, overhead_cost, total_cost, unit_price, total_price)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """, (calc_id, item["subtype_id"], item["material_id"], json.dumps(item["params"]),
-                  item["quantity"], item["area"], item["material_cost"], item.get("flange_cost", 0),
-                  item["labor_cost"], item["overhead_cost"], item["total_cost"], item["unit_price"], item["total_price"]))
+            """,
+                (
+                    calc_id,
+                    item["subtype_id"],
+                    item["material_id"],
+                    json.dumps(item["params"]),
+                    item["quantity"],
+                    item["area"],
+                    item["material_cost"],
+                    item.get("flange_cost", 0),
+                    item["labor_cost"],
+                    item["overhead_cost"],
+                    item["total_cost"],
+                    item["unit_price"],
+                    item["total_price"],
+                ),
+            )
         db.commit()
         db.close()
-
 
         # --- Автоматичне додавання матеріалів/робіт у проект ---
         if self.project_id and self.calc_items:
             try:
-                from ventilation_company.models.project import Project
                 from ventilation_company.project_builder.project import ProjectService
+
                 proj = ProjectService.load_from_db(self.project_id)
                 if proj:
                     for item in self.calc_items:
@@ -573,17 +676,32 @@ class DetailCalculatorFrame(tk.Frame):
 
                         # Фланець (якщо є)
                         if item.get("has_flange") and item.get("flange_cost", 0) > 0:
-                            flange_qty = item["flange_perimeter"] * item["flange_qty"] * item["quantity"]
-                            flange_unit_price = item["flange_cost"] / (item["flange_perimeter"] * item["flange_qty"]) if (item["flange_perimeter"] * item["flange_qty"]) > 0 else 0
-                            proj.add_material("Фланець (профіль+кутник)", flange_qty, "м", flange_unit_price)
+                            flange_qty = (
+                                item["flange_perimeter"] * item["flange_qty"] * item["quantity"]
+                            )
+                            flange_unit_price = (
+                                item["flange_cost"]
+                                / (item["flange_perimeter"] * item["flange_qty"])
+                                if (item["flange_perimeter"] * item["flange_qty"]) > 0
+                                else 0
+                            )
+                            proj.add_material(
+                                "Фланець (профіль+кутник)", flange_qty, "м", flange_unit_price
+                            )
 
                         # Робота (виготовлення)
                         work_price = item["labor_cost"] + item["overhead_cost"]
-                        proj.add_work(f"Виготовлення: {item['subtype_name']}", item["quantity"], "шт", work_price)
+                        proj.add_work(
+                            f"Виготовлення: {item['subtype_name']}",
+                            item["quantity"],
+                            "шт",
+                            work_price,
+                        )
 
                     proj.update_in_db()
-            except Exception as e:
+            except Exception:
                 import traceback
+
                 traceback.print_exc()
         # -------------------------------------------------------
 
@@ -594,12 +712,16 @@ class DetailCalculatorFrame(tk.Frame):
         self.res_profit.config(text=f"{total_sale - total_cost:.2f} грн")
 
         if group_discount > 0:
-            self.discount_info.config(text=f"💸 Застосовано групову знижку: {group_discount}% (всього {total_qty} шт)")
+            self.discount_info.config(
+                text=f"💸 Застосовано групову знижку: {group_discount}% (всього {total_qty} шт)"
+            )
         else:
             self.discount_info.config(text="")
 
         detail = f"КП №{calc_id}\nКлієнт: {self.calc_client.get() or '—'}\n\n"
-        detail += f"=== РОБОТА: {'за м²' if labor_mode == 'm2' else 'за годину'} ({labor_rate} грн) ===\n"
+        detail += (
+            f"=== РОБОТА: {'за м²' if labor_mode == 'm2' else 'за годину'} ({labor_rate} грн) ===\n"
+        )
         if group_discount > 0:
             detail += f"=== ГРУПОВА ЗНИЖКА: {group_discount}% ===\n"
         detail += "=== НАКЛАДНІ ВИТРАТИ ===\n"
@@ -672,56 +794,62 @@ class DetailCalculatorFrame(tk.Frame):
     def _get_calc_report_data(self, calc_id):
         db = get_calc_db()
         calc = db.execute("SELECT * FROM calc_calculations WHERE id=?", (calc_id,)).fetchone()
-        items = db.execute("""
+        items = db.execute(
+            """
             SELECT ci.*, ps.name as subtype_name, m.name as material_name, m.thickness
             FROM calc_items ci
             JOIN product_subtypes ps ON ci.subtype_id = ps.id
             JOIN calc_materials m ON ci.material_id = m.id
             WHERE ci.calculation_id = ?
-        """, (calc_id,)).fetchall()
+        """,
+            (calc_id,),
+        ).fetchall()
         return calc, items
 
     def _build_html_report(self, calc, items, summary):
         """Будує HTML-звіт через ExportService."""
         data = []
         for item in items:
-            data.append({
-                "№": item.get("id", ""),
-                "Виріб": item.get("subtype_name", ""),
-                "Матеріал": item.get("material_name", ""),
-                "К-ть": item.get("quantity", ""),
-                "Площа": f"{item.get('area', 0):.3f}",
-                "Собівартість": f"{item.get('total_cost', 0):.2f}",
-                "Ціна": f"{item.get('unit_price', 0):.2f}",
-                "Сума": f"{item.get('total_price', 0):.2f}",
-            })
+            data.append(
+                {
+                    "№": item.get("id", ""),
+                    "Виріб": item.get("subtype_name", ""),
+                    "Матеріал": item.get("material_name", ""),
+                    "К-ть": item.get("quantity", ""),
+                    "Площа": f"{item.get('area', 0):.3f}",
+                    "Собівартість": f"{item.get('total_cost', 0):.2f}",
+                    "Ціна": f"{item.get('unit_price', 0):.2f}",
+                    "Сума": f"{item.get('total_price', 0):.2f}",
+                }
+            )
         return ExportService.build_html_report(
-            title=f"КП №{calc['id']} — {calc.get('client_name', '')}",
-            data=data,
-            summary=summary
+            title=f"КП №{calc['id']} — {calc.get('client_name', '')}", data=data, summary=summary
         )
 
     def _export_to_xlsx(self, calc, items, summary, filepath=None):
         """Експортує у Excel через ExportService."""
         data = []
         for item in items:
-            data.append({
-                "№": item.get("id", ""),
-                "Виріб": item.get("subtype_name", ""),
-                "Матеріал": item.get("material_name", ""),
-                "К-ть": item.get("quantity", ""),
-                "Площа": item.get("area", 0),
-                "Собівартість": item.get("total_cost", 0),
-                "Ціна": item.get("unit_price", 0),
-                "Сума": item.get("total_price", 0),
-            })
+            data.append(
+                {
+                    "№": item.get("id", ""),
+                    "Виріб": item.get("subtype_name", ""),
+                    "Матеріал": item.get("material_name", ""),
+                    "К-ть": item.get("quantity", ""),
+                    "Площа": item.get("area", 0),
+                    "Собівартість": item.get("total_cost", 0),
+                    "Ціна": item.get("unit_price", 0),
+                    "Сума": item.get("total_price", 0),
+                }
+            )
         return ExportService.to_excel(data, filepath)
 
     def _print_report(self, calc_id):
         calc, items = self._get_calc_report_data(calc_id)
         path = self._build_html_report(calc_id, calc, items, auto_print=True)
         webbrowser.open(f"file:///{path.replace(chr(92), '/')}")
-# ═══════════════════════════════════════════════
+
+    # ═══════════════════════════════════════════════
     #  ТИПИ ВИРОБІВ
     # ═══════════════════════════════════════════════
 
@@ -732,13 +860,15 @@ class DetailCalculatorFrame(tk.Frame):
     def export_to_price_list(self):
         """Експорт розрахованих позицій у ventilation_price_list.json"""
         if not self.calc_items:
-            messagebox.showwarning("Увага", "Немає позицій для експорту. Спочатку розрахуйте вироби.")
+            messagebox.showwarning(
+                "Увага", "Немає позицій для експорту. Спочатку розрахуйте вироби."
+            )
             return
         filepath = "ventilation_price_list.json"
         data = []
         if os.path.exists(filepath):
             try:
-                with open(filepath, "r", encoding="utf-8") as f:
+                with open(filepath, encoding="utf-8") as f:
                     data = json.load(f)
             except Exception:
                 data = []
@@ -746,7 +876,14 @@ class DetailCalculatorFrame(tk.Frame):
         for item in self.calc_items:
             entry = {
                 "Назва виробу": item.get("subtype_name", "Виріб"),
-                "Тип": next((t["name"] for t in ProductRepo.get_all_types() if t["id"] == item.get("type_id")), ""),
+                "Тип": next(
+                    (
+                        t["name"]
+                        for t in ProductRepo.get_all_types()
+                        if t["id"] == item.get("type_id")
+                    ),
+                    "",
+                ),
                 "Підтип": item.get("subtype_name", ""),
                 "Матеріал": item.get("material_name", ""),
                 "Розміри": item.get("params", {}),
@@ -761,29 +898,43 @@ class DetailCalculatorFrame(tk.Frame):
         try:
             with open(filepath, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
-            messagebox.showinfo("Готово", "Експортовано " + str(exported) + " позицій у прайс-лист!\nФайл: " + filepath)
+            messagebox.showinfo(
+                "Готово",
+                "Експортовано " + str(exported) + " позицій у прайс-лист!\nФайл: " + filepath,
+            )
         except Exception as e:
             messagebox.showerror("Помилка", "Не вдалося записати прайс-лист: " + str(e))
 
     def _init_templates_db(self):
         db = get_calc_db()
         c = db.cursor()
-        c.execute("""
+        c.execute(
+            """
             CREATE TABLE IF NOT EXISTS calc_templates (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 items_json TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """)
+        """
+        )
         _invalidate_db_cache()
 
     def build_templates(self):
-        ttk.Label(self.templates_frame, text="📄 Шаблони виробів", style="DC.Title.TLabel").pack(anchor="w", padx=15, pady=(15, 10))
-        ttk.Label(self.templates_frame, text="Збережіть часто використовувані набори виробів як шаблони для швидкого завантаження.",
-                  font=("Segoe UI", 10), foreground="#666", wraplength=900).pack(anchor="w", padx=15, pady=(0, 10))
+        ttk.Label(self.templates_frame, text="📄 Шаблони виробів", style="DC.Title.TLabel").pack(
+            anchor="w", padx=15, pady=(15, 10)
+        )
+        ttk.Label(
+            self.templates_frame,
+            text="Збережіть часто використовувані набори виробів як шаблони для швидкого завантаження.",
+            font=("Segoe UI", 10),
+            foreground="#666",
+            wraplength=900,
+        ).pack(anchor="w", padx=15, pady=(0, 10))
         columns = ("id", "Назва шаблону", "Позицій", "Дата створення")
-        self.tpl_tree = ttk.Treeview(self.templates_frame, columns=columns, show="headings", height=12, style="DC.Treeview")
+        self.tpl_tree = ttk.Treeview(
+            self.templates_frame, columns=columns, show="headings", height=12, style="DC.Treeview"
+        )
         for col in columns:
             self.tpl_tree.heading(col, text=col)
         self.tpl_tree.column("id", width=50, anchor="center")
@@ -797,11 +948,25 @@ class DetailCalculatorFrame(tk.Frame):
         vsb.pack(side="right", fill="y", padx=(0, 15))
         btn_frame = ttk.Frame(self.templates_frame, style="DC.TFrame")
         btn_frame.pack(fill="x", padx=15, pady=10)
-        ttk.Button(btn_frame, text="💾 Зберегти поточний як шаблон", command=self.save_template_dialog).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="📂 Завантажити шаблон", command=self.load_template).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="🗑 Видалити шаблон", command=self.delete_template).pack(side="left", padx=5)
-        self.tpl_preview = tk.Text(self.templates_frame, height=8, wrap="word", font=("Segoe UI", 10),
-                                    bg="#fafafa", relief="solid", borderwidth=1, state="disabled")
+        ttk.Button(
+            btn_frame, text="💾 Зберегти поточний як шаблон", command=self.save_template_dialog
+        ).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="📂 Завантажити шаблон", command=self.load_template).pack(
+            side="left", padx=5
+        )
+        ttk.Button(btn_frame, text="🗑 Видалити шаблон", command=self.delete_template).pack(
+            side="left", padx=5
+        )
+        self.tpl_preview = tk.Text(
+            self.templates_frame,
+            height=8,
+            wrap="word",
+            font=("Segoe UI", 10),
+            bg="#fafafa",
+            relief="solid",
+            borderwidth=1,
+            state="disabled",
+        )
         self.tpl_preview.pack(fill="x", padx=15, pady=10)
         self.load_templates_data()
 
@@ -814,7 +979,9 @@ class DetailCalculatorFrame(tk.Frame):
             db.close()
             for t in tpls:
                 items = json.loads(t["items_json"])
-                self.tpl_tree.insert("", "end", values=(t["id"], t["name"], len(items), t["created_at"]))
+                self.tpl_tree.insert(
+                    "", "end", values=(t["id"], t["name"], len(items), t["created_at"])
+                )
         except Exception:
             pass
 
@@ -829,7 +996,16 @@ class DetailCalculatorFrame(tk.Frame):
         items = json.loads(tpl["items_json"])
         text = "Шаблон: " + tpl["name"] + "\nПозицій: " + str(len(items)) + "\n\n"
         for i, it in enumerate(items, 1):
-            text += str(i) + ". " + it.get("subtype_name", "—") + " — " + it.get("material_name", "—") + " × " + str(it.get("quantity", 1)) + "\n"
+            text += (
+                str(i)
+                + ". "
+                + it.get("subtype_name", "—")
+                + " — "
+                + it.get("material_name", "—")
+                + " × "
+                + str(it.get("quantity", 1))
+                + "\n"
+            )
             if it.get("params"):
                 text += "   Розміри: " + json.dumps(it["params"]) + "\n"
         self.tpl_preview.config(state="normal")
@@ -850,6 +1026,7 @@ class DetailCalculatorFrame(tk.Frame):
         name_entry = ttk.Entry(dialog, width=40)
         name_entry.pack(fill="x", padx=20)
         name_entry.insert(0, "Шаблон " + datetime.now().strftime("%d.%m.%Y %H:%M"))
+
         def save():
             name = name_entry.get().strip()
             if not name:
@@ -857,18 +1034,34 @@ class DetailCalculatorFrame(tk.Frame):
                 return
             clean_items = []
             for it in self.calc_items:
-                clean = {k: v for k, v in it.items() if k not in ("unit_price", "total_price", "material_cost", "labor_cost", "overhead_cost", "total_cost", "flange_cost")}
+                clean = {
+                    k: v
+                    for k, v in it.items()
+                    if k
+                    not in (
+                        "unit_price",
+                        "total_price",
+                        "material_cost",
+                        "labor_cost",
+                        "overhead_cost",
+                        "total_cost",
+                        "flange_cost",
+                    )
+                }
                 clean_items.append(clean)
             db = get_calc_db()
             c = db.cursor()
-            c.execute("INSERT INTO calc_templates (name, items_json) VALUES (?,?)",
-                     (name, json.dumps(clean_items)))
+            c.execute(
+                "INSERT INTO calc_templates (name, items_json) VALUES (?,?)",
+                (name, json.dumps(clean_items)),
+            )
             db.commit()
             db.close()
             _invalidate_db_cache()
             dialog.destroy()
             self.load_templates_data()
             messagebox.showinfo("Готово", "Шаблон '" + name + "' збережено!")
+
         ttk.Button(dialog, text="Зберегти", command=save).pack(pady=15)
 
     def load_template(self):
@@ -881,7 +1074,14 @@ class DetailCalculatorFrame(tk.Frame):
         if not tpl:
             return
         items = json.loads(tpl["items_json"])
-        if messagebox.askyesno("Підтвердження", "Завантажити шаблон '" + tpl["name"] + "' (" + str(len(items)) + " позицій)?\n\nПоточний список буде очищено."):
+        if messagebox.askyesno(
+            "Підтвердження",
+            "Завантажити шаблон '"
+            + tpl["name"]
+            + "' ("
+            + str(len(items))
+            + " позицій)?\n\nПоточний список буде очищено.",
+        ):
             self.calc_items = items
             self.refresh_calc_tree()
             messagebox.showinfo("Готово", "Шаблон '" + tpl["name"] + "' завантажено!")
@@ -903,9 +1103,15 @@ class DetailCalculatorFrame(tk.Frame):
         dialog.geometry("450x350")
         dialog.transient(self)
         dialog.grab_set()
-        ttk.Label(dialog, text="Налаштування групових знижок", style="DC.Title.TLabel").pack(anchor="w", padx=15, pady=10)
-        ttk.Label(dialog, text="Знижка автоматично застосовується при розрахунку КП.",
-                  font=("Segoe UI", 10), foreground="#666").pack(anchor="w", padx=15)
+        ttk.Label(dialog, text="Налаштування групових знижок", style="DC.Title.TLabel").pack(
+            anchor="w", padx=15, pady=10
+        )
+        ttk.Label(
+            dialog,
+            text="Знижка автоматично застосовується при розрахунку КП.",
+            font=("Segoe UI", 10),
+            foreground="#666",
+        ).pack(anchor="w", padx=15)
         frame = ttk.Frame(dialog, style="DC.TFrame")
         frame.pack(fill="x", padx=15, pady=10)
         ttk.Label(frame, text="Від 5 шт:").grid(row=0, column=0, padx=5, pady=5)
@@ -929,7 +1135,10 @@ class DetailCalculatorFrame(tk.Frame):
         self.disc_50.grid(row=3, column=1, padx=5, pady=5)
         ttk.Label(frame, text="%").grid(row=3, column=2, padx=5, pady=5)
         self.disc_enabled = tk.BooleanVar(value=False)
-        ttk.Checkbutton(dialog, text="Увімкнути групові знижки", variable=self.disc_enabled).pack(anchor="w", padx=15, pady=10)
+        ttk.Checkbutton(dialog, text="Увімкнути групові знижки", variable=self.disc_enabled).pack(
+            anchor="w", padx=15, pady=10
+        )
+
         def save():
             table = {
                 "5": float(self.disc_5.get() or 0),
@@ -939,24 +1148,33 @@ class DetailCalculatorFrame(tk.Frame):
             }
             db = get_calc_db()
             c = db.cursor()
-            c.execute("INSERT OR REPLACE INTO calc_settings (key, value) VALUES (?,?)",
-                     ("group_discount_enabled", "1" if self.disc_enabled.get() else "0"))
-            c.execute("INSERT OR REPLACE INTO calc_settings (key, value) VALUES (?,?)",
-                     ("group_discount_table", json.dumps(table)))
+            c.execute(
+                "INSERT OR REPLACE INTO calc_settings (key, value) VALUES (?,?)",
+                ("group_discount_enabled", "1" if self.disc_enabled.get() else "0"),
+            )
+            c.execute(
+                "INSERT OR REPLACE INTO calc_settings (key, value) VALUES (?,?)",
+                ("group_discount_table", json.dumps(table)),
+            )
             db.commit()
             db.close()
             _invalidate_db_cache()
             dialog.destroy()
             messagebox.showinfo("Готово", "Налаштування знижок збережено!")
+
         ttk.Button(dialog, text="💾 Зберегти", command=save).pack(pady=10)
 
     def _get_group_discount(self, total_qty):
         db = get_calc_db()
-        enabled = db.execute("SELECT value FROM calc_settings WHERE key='group_discount_enabled'").fetchone()
+        enabled = db.execute(
+            "SELECT value FROM calc_settings WHERE key='group_discount_enabled'"
+        ).fetchone()
         if not enabled or enabled["value"] != "1":
             db.close()
             return 0.0
-        table_row = db.execute("SELECT value FROM calc_settings WHERE key='group_discount_table'").fetchone()
+        table_row = db.execute(
+            "SELECT value FROM calc_settings WHERE key='group_discount_table'"
+        ).fetchone()
         if not table_row:
             return 0.0
         table = json.loads(table_row["value"])
@@ -968,7 +1186,9 @@ class DetailCalculatorFrame(tk.Frame):
 
     def compare_calculations_dialog(self):
         db = get_calc_db()
-        calcs = db.execute("SELECT id, client_name, created_at, total_cost, sale_price FROM calc_calculations ORDER BY created_at DESC LIMIT 20").fetchall()
+        calcs = db.execute(
+            "SELECT id, client_name, created_at, total_cost, sale_price FROM calc_calculations ORDER BY created_at DESC LIMIT 20"
+        ).fetchall()
         if len(calcs) < 2:
             messagebox.showwarning("Увага", "Потрібно мінімум 2 КП для порівняння.")
             return
@@ -977,19 +1197,37 @@ class DetailCalculatorFrame(tk.Frame):
         dialog.geometry("900x600")
         dialog.transient(self)
         dialog.grab_set()
-        ttk.Label(dialog, text="Виберіть 2-3 КП для порівняння:", style="DC.Title.TLabel").pack(anchor="w", padx=15, pady=10)
+        ttk.Label(dialog, text="Виберіть 2-3 КП для порівняння:", style="DC.Title.TLabel").pack(
+            anchor="w", padx=15, pady=10
+        )
         list_frame = ttk.Frame(dialog, style="DC.TFrame")
         list_frame.pack(fill="x", padx=15, pady=5)
         self.compare_vars = {}
         for c in calcs:
             var = tk.BooleanVar(value=False)
             self.compare_vars[c["id"]] = var
-            ttk.Checkbutton(list_frame, text="КП №" + str(c["id"]) + " — " + (c["client_name"] or "—") + " — " + c["created_at"] + " — " + str(round(c["sale_price"], 2)) + " грн",
-                           variable=var).pack(anchor="w", pady=2)
-        result_frame = ttk.LabelFrame(dialog, text="Результат порівняння", padding=10, style="DC.Card.TLabelframe")
+            ttk.Checkbutton(
+                list_frame,
+                text="КП №"
+                + str(c["id"])
+                + " — "
+                + (c["client_name"] or "—")
+                + " — "
+                + c["created_at"]
+                + " — "
+                + str(round(c["sale_price"], 2))
+                + " грн",
+                variable=var,
+            ).pack(anchor="w", pady=2)
+        result_frame = ttk.LabelFrame(
+            dialog, text="Результат порівняння", padding=10, style="DC.Card.TLabelframe"
+        )
         result_frame.pack(fill="both", expand=True, padx=15, pady=10)
-        self.compare_result = tk.Text(result_frame, wrap="word", font=("Segoe UI", 10), bg="#fafafa", state="disabled")
+        self.compare_result = tk.Text(
+            result_frame, wrap="word", font=("Segoe UI", 10), bg="#fafafa", state="disabled"
+        )
         self.compare_result.pack(fill="both", expand=True)
+
         def do_compare():
             selected = [cid for cid, var in self.compare_vars.items() if var.get()]
             if len(selected) < 2:
@@ -999,12 +1237,15 @@ class DetailCalculatorFrame(tk.Frame):
             results = []
             for cid in selected:
                 calc = db.execute("SELECT * FROM calc_calculations WHERE id=?", (cid,)).fetchone()
-                items = db.execute("""
+                items = db.execute(
+                    """
                     SELECT ci.*, ps.name as subtype_name
                     FROM calc_items ci
                     JOIN product_subtypes ps ON ci.subtype_id = ps.id
                     WHERE ci.calculation_id = ?
-                """, (cid,)).fetchall()
+                """,
+                    (cid,),
+                ).fetchall()
                 results.append({"calc": dict(calc), "items": [dict(it) for it in items]})
             db.close()
             text = "📊 ПОРІВНЯННЯ КП\n" + "=" * 60 + "\n\n"
@@ -1014,23 +1255,45 @@ class DetailCalculatorFrame(tk.Frame):
                 text += "  Собівартість: " + str(round(c["total_cost"], 2)) + " грн\n"
                 text += "  Ціна продажу: " + str(round(c["sale_price"], 2)) + " грн\n"
                 text += "  Прибуток: " + str(round(c["sale_price"] - c["total_cost"], 2)) + " грн\n"
-                margin = ((c["sale_price"] - c["total_cost"]) / c["sale_price"] * 100) if c["sale_price"] > 0 else 0
+                margin = (
+                    ((c["sale_price"] - c["total_cost"]) / c["sale_price"] * 100)
+                    if c["sale_price"] > 0
+                    else 0
+                )
                 text += "  Маржа: " + str(round(margin, 1)) + "%\n"
                 text += "  Позицій: " + str(len(r["items"])) + "\n\n"
             text += "📈 ЗВЕДЕНА ТАБЛИЦЯ\n" + "-" * 60 + "\n"
-            text += "{:<10} {:<15} {:<15} {:<15} {:<10}\n".format("КП", "Собівартість", "Продаж", "Прибуток", "Маржа")
+            text += "{:<10} {:<15} {:<15} {:<15} {:<10}\n".format(
+                "КП", "Собівартість", "Продаж", "Прибуток", "Маржа"
+            )
             text += "-" * 60 + "\n"
             for r in results:
                 c = r["calc"]
-                margin = ((c["sale_price"] - c["total_cost"]) / c["sale_price"] * 100) if c["sale_price"] > 0 else 0
+                margin = (
+                    ((c["sale_price"] - c["total_cost"]) / c["sale_price"] * 100)
+                    if c["sale_price"] > 0
+                    else 0
+                )
                 text += "№{:<9} {:<15.2f} {:<15.2f} {:<15.2f} {:<10.1f}%\n".format(
-                    c["id"], c["total_cost"], c["sale_price"], c["sale_price"] - c["total_cost"], margin)
+                    c["id"],
+                    c["total_cost"],
+                    c["sale_price"],
+                    c["sale_price"] - c["total_cost"],
+                    margin,
+                )
             best = max(results, key=lambda x: x["calc"]["sale_price"] - x["calc"]["total_cost"])
-            text += "\n🏆 Найприбутковіший: КП №" + str(best["calc"]["id"]) + " (" + (best["calc"]["client_name"] or "—") + ")\n"
+            text += (
+                "\n🏆 Найприбутковіший: КП №"
+                + str(best["calc"]["id"])
+                + " ("
+                + (best["calc"]["client_name"] or "—")
+                + ")\n"
+            )
             self.compare_result.config(state="normal")
             self.compare_result.delete("1.0", "end")
             self.compare_result.insert("1.0", text)
             self.compare_result.config(state="disabled")
+
         ttk.Button(dialog, text="📊 Порівняти", command=do_compare).pack(pady=10)
 
     def clear_calc_items(self):
@@ -1054,7 +1317,13 @@ class DetailCalculatorFrame(tk.Frame):
 
         ttk.Label(left, text="Типи виробів", style="DC.Title.TLabel").pack(anchor="w", pady=(0, 10))
 
-        self.types_tree = ttk.Treeview(left, columns=("id", "Назва", "Slug", "Іконка"), show="headings", height=10, style="DC.Treeview")
+        self.types_tree = ttk.Treeview(
+            left,
+            columns=("id", "Назва", "Slug", "Іконка"),
+            show="headings",
+            height=10,
+            style="DC.Treeview",
+        )
         self.types_tree.heading("id", text="ID")
         self.types_tree.heading("Назва", text="Назва")
         self.types_tree.heading("Slug", text="Slug")
@@ -1068,8 +1337,12 @@ class DetailCalculatorFrame(tk.Frame):
 
         btn_frame = ttk.Frame(left, style="DC.TFrame")
         btn_frame.pack(fill="x", pady=10)
-        ttk.Button(btn_frame, text="➕ Додати тип", command=self.add_type_dialog).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="✏️ Редагувати", command=self.edit_type_dialog).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="➕ Додати тип", command=self.add_type_dialog).pack(
+            side="left", padx=5
+        )
+        ttk.Button(btn_frame, text="✏️ Редагувати", command=self.edit_type_dialog).pack(
+            side="left", padx=5
+        )
         ttk.Button(btn_frame, text="🗑 Видалити", command=self.delete_type).pack(side="left", padx=5)
 
         right = ttk.Frame(self.types_frame, width=800)
@@ -1078,7 +1351,13 @@ class DetailCalculatorFrame(tk.Frame):
 
         ttk.Label(right, text="Підтипи", style="DC.Title.TLabel").pack(anchor="w", pady=(0, 10))
 
-        self.subtypes_tree = ttk.Treeview(right, columns=("id", "Назва", "Форма", "Формула", "Відходи", "Час"), show="headings", height=8, style="DC.Treeview")
+        self.subtypes_tree = ttk.Treeview(
+            right,
+            columns=("id", "Назва", "Форма", "Формула", "Відходи", "Час"),
+            show="headings",
+            height=8,
+            style="DC.Treeview",
+        )
         self.subtypes_tree.heading("id", text="ID")
         self.subtypes_tree.heading("Назва", text="Назва")
         self.subtypes_tree.heading("Форма", text="Форма")
@@ -1096,13 +1375,27 @@ class DetailCalculatorFrame(tk.Frame):
 
         btn_frame2 = ttk.Frame(right, style="DC.TFrame")
         btn_frame2.pack(fill="x", pady=10)
-        ttk.Button(btn_frame2, text="➕ Додати підтип", command=self.add_subtype_dialog).pack(side="left", padx=5)
-        ttk.Button(btn_frame2, text="✏️ Редагувати", command=self.edit_subtype_dialog).pack(side="left", padx=5)
-        ttk.Button(btn_frame2, text="🔗 Синхронізувати матеріали", command=self.sync_materials_to_subtypes).pack(side="left", padx=5)
+        ttk.Button(btn_frame2, text="➕ Додати підтип", command=self.add_subtype_dialog).pack(
+            side="left", padx=5
+        )
+        ttk.Button(btn_frame2, text="✏️ Редагувати", command=self.edit_subtype_dialog).pack(
+            side="left", padx=5
+        )
+        ttk.Button(
+            btn_frame2, text="🔗 Синхронізувати матеріали", command=self.sync_materials_to_subtypes
+        ).pack(side="left", padx=5)
 
-        ttk.Label(right, text="Розмірні ряди", style="DC.Title.TLabel").pack(anchor="w", pady=(10, 5))
+        ttk.Label(right, text="Розмірні ряди", style="DC.Title.TLabel").pack(
+            anchor="w", pady=(10, 5)
+        )
 
-        self.sizes_tree = ttk.Treeview(right, columns=("id", "Параметр", "Мін", "Макс", "Крок", "Од", "Значення"), show="headings", height=6, style="DC.Treeview")
+        self.sizes_tree = ttk.Treeview(
+            right,
+            columns=("id", "Параметр", "Мін", "Макс", "Крок", "Од", "Значення"),
+            show="headings",
+            height=6,
+            style="DC.Treeview",
+        )
         self.sizes_tree.heading("id", text="ID")
         self.sizes_tree.column("id", width=0, stretch=False)
         for col in ("Параметр", "Мін", "Макс", "Крок", "Од", "Значення"):
@@ -1114,9 +1407,15 @@ class DetailCalculatorFrame(tk.Frame):
 
         size_btn_frame = ttk.Frame(right, style="DC.TFrame")
         size_btn_frame.pack(fill="x", pady=10)
-        ttk.Button(size_btn_frame, text="➕ Додати", command=self.add_size_dialog).pack(side="left", padx=5)
-        ttk.Button(size_btn_frame, text="✏️ Редагувати", command=self.edit_size_dialog2).pack(side="left", padx=5)
-        ttk.Button(size_btn_frame, text="🗑 Видалити", command=self.delete_size).pack(side="left", padx=5)
+        ttk.Button(size_btn_frame, text="➕ Додати", command=self.add_size_dialog).pack(
+            side="left", padx=5
+        )
+        ttk.Button(size_btn_frame, text="✏️ Редагувати", command=self.edit_size_dialog2).pack(
+            side="left", padx=5
+        )
+        ttk.Button(size_btn_frame, text="🗑 Видалити", command=self.delete_size).pack(
+            side="left", padx=5
+        )
 
         self.load_types_data()
 
@@ -1128,8 +1427,10 @@ class DetailCalculatorFrame(tk.Frame):
         added = 0
         for st in subtypes:
             for mat in materials:
-                c.execute("INSERT OR IGNORE INTO subtype_materials (subtype_id, material_id, is_default) VALUES (?,?,0)",
-                         (st["id"], mat["id"]))
+                c.execute(
+                    "INSERT OR IGNORE INTO subtype_materials (subtype_id, material_id, is_default) VALUES (?,?,0)",
+                    (st["id"], mat["id"]),
+                )
                 if c.rowcount > 0:
                     added += 1
         messagebox.showinfo("Готово", f"Синхронізовано! Додано {added} нових зв'язків матеріалів.")
@@ -1140,7 +1441,9 @@ class DetailCalculatorFrame(tk.Frame):
             self.types_tree.delete(row)
         types = ProductRepo.get_all_types()
         for t in types:
-            self.types_tree.insert("", "end", values=(t["id"], t["name"], t["slug"], t["icon"] or ""))
+            self.types_tree.insert(
+                "", "end", values=(t["id"], t["name"], t["slug"], t["icon"] or "")
+            )
 
     def on_type_select(self, event=None):
         selected = self.types_tree.selection()
@@ -1157,7 +1460,18 @@ class DetailCalculatorFrame(tk.Frame):
         subtypes = ProductRepo.get_subtypes_by_type(int(type_id))
         for s in subtypes:
             shape_label = "🔵 Круглий" if s["shape_type"] == "round" else "🟦 Прямокутний"
-            self.subtypes_tree.insert("", "end", values=(s["id"], s["name"], shape_label, s["formula"], s["waste_factor"], s["labor_norm"]))
+            self.subtypes_tree.insert(
+                "",
+                "end",
+                values=(
+                    s["id"],
+                    s["name"],
+                    shape_label,
+                    s["formula"],
+                    s["waste_factor"],
+                    s["labor_norm"],
+                ),
+            )
 
     def on_subtype_select(self, event=None):
         selected = self.subtypes_tree.selection()
@@ -1172,11 +1486,19 @@ class DetailCalculatorFrame(tk.Frame):
         sizes = ProductRepo.get_sizes_by_subtype(subtype_id)
         for sz in sizes:
             vals = json.loads(sz["values_json"]) if sz["values_json"] else "—"
-            self.sizes_tree.insert("", "end", values=(
-                sz["id"], f"{sz['param_label']} ({sz['param_name']})",
-                sz["min_value"] or "—", sz["max_value"] or "—", sz["step"] or "—",
-                sz["unit"], str(vals)
-            ))
+            self.sizes_tree.insert(
+                "",
+                "end",
+                values=(
+                    sz["id"],
+                    f"{sz['param_label']} ({sz['param_name']})",
+                    sz["min_value"] or "—",
+                    sz["max_value"] or "—",
+                    sz["step"] or "—",
+                    sz["unit"],
+                    str(vals),
+                ),
+            )
 
     def add_type_dialog(self):
         dialog = tk.Toplevel(self)
@@ -1202,8 +1524,10 @@ class DetailCalculatorFrame(tk.Frame):
             slug = name.lower().replace(" ", "-").replace("'", "")
             db = get_calc_db()
             c = db.cursor()
-            c.execute("INSERT INTO product_types (name, slug, icon, sort_order) VALUES (?,?,?,?)",
-                     (name, slug, icon_entry.get(), 99))
+            c.execute(
+                "INSERT INTO product_types (name, slug, icon, sort_order) VALUES (?,?,?,?)",
+                (name, slug, icon_entry.get(), 99),
+            )
             db.commit()
             db.close()
             dialog.destroy()
@@ -1254,8 +1578,10 @@ class DetailCalculatorFrame(tk.Frame):
                 return
             db = get_calc_db()
             c = db.cursor()
-            c.execute("UPDATE product_types SET name=?, slug=?, icon=? WHERE id=?",
-                     (name, slug, icon_entry.get(), type_id))
+            c.execute(
+                "UPDATE product_types SET name=?, slug=?, icon=? WHERE id=?",
+                (name, slug, icon_entry.get(), type_id),
+            )
             db.commit()
             db.close()
             dialog.destroy()
@@ -1277,7 +1603,7 @@ class DetailCalculatorFrame(tk.Frame):
         self.load_calc_data()
 
     def add_subtype_dialog(self):
-        if not hasattr(self, 'current_type_id') or not self.current_type_id:
+        if not hasattr(self, "current_type_id") or not self.current_type_id:
             messagebox.showwarning("Увага", "Спочатку виберіть тип виробів")
             return
 
@@ -1295,8 +1621,12 @@ class DetailCalculatorFrame(tk.Frame):
         shape_frame = ttk.Frame(dialog, style="DC.TFrame")
         shape_frame.pack(anchor="w", padx=20, fill="x")
         shape_var = tk.StringVar(value="round")
-        ttk.Radiobutton(shape_frame, text="🔵 Круглий", variable=shape_var, value="round").pack(side="left", padx=(0, 15))
-        ttk.Radiobutton(shape_frame, text="🟦 Прямокутний", variable=shape_var, value="rect").pack(side="left")
+        ttk.Radiobutton(shape_frame, text="🔵 Круглий", variable=shape_var, value="round").pack(
+            side="left", padx=(0, 15)
+        )
+        ttk.Radiobutton(shape_frame, text="🟦 Прямокутний", variable=shape_var, value="rect").pack(
+            side="left"
+        )
 
         ttk.Label(dialog, text="Формула розгортки:").pack(anchor="w", padx=20, pady=(10, 5))
         formula_entry = ttk.Entry(dialog, width=50)
@@ -1324,7 +1654,9 @@ class DetailCalculatorFrame(tk.Frame):
                 flange_check.config(text="✅ Може мати фланець (прямокутний)")
                 if not formula_entry.get().startswith("2 * ("):
                     formula_entry.delete(0, "end")
-                    formula_entry.insert(0, "2 * (width/1000 + height/1000 + 2*0.003) * (length/1000)")
+                    formula_entry.insert(
+                        0, "2 * (width/1000 + height/1000 + 2*0.003) * (length/1000)"
+                    )
                 if has_flange_var.get() and not flange_entry.get():
                     flange_entry.delete(0, "end")
                     flange_entry.insert(0, "2 * (width/1000 + height/1000)")
@@ -1365,16 +1697,30 @@ class DetailCalculatorFrame(tk.Frame):
             flange_formula = flange_entry.get().strip() if has_flange_var.get() else None
             db = get_calc_db()
             c = db.cursor()
-            c.execute("""
+            c.execute(
+                """
                 INSERT INTO product_subtypes (product_type_id, name, slug, formula, shape_type, flange_perimeter_formula, waste_factor, labor_norm, description)
                 VALUES (?,?,?,?,?,?,?,?,?)
-            """, (self.current_type_id, name, slug, formula, shape_var.get(), flange_formula, float(waste_entry.get() or 1.18),
-                  float(labor_entry.get() or 0.5), desc_entry.get()))
+            """,
+                (
+                    self.current_type_id,
+                    name,
+                    slug,
+                    formula,
+                    shape_var.get(),
+                    flange_formula,
+                    float(waste_entry.get() or 1.18),
+                    float(labor_entry.get() or 0.5),
+                    desc_entry.get(),
+                ),
+            )
             subtype_id = c.lastrowid
             materials = c.execute("SELECT id FROM calc_materials WHERE is_active=1").fetchall()
             for mat in materials:
-                c.execute("INSERT OR IGNORE INTO subtype_materials (subtype_id, material_id, is_default) VALUES (?,?,0)",
-                         (subtype_id, mat["id"]))
+                c.execute(
+                    "INSERT OR IGNORE INTO subtype_materials (subtype_id, material_id, is_default) VALUES (?,?,0)",
+                    (subtype_id, mat["id"]),
+                )
             db.commit()
             db.close()
             dialog.destroy()
@@ -1410,8 +1756,12 @@ class DetailCalculatorFrame(tk.Frame):
         shape_frame = ttk.Frame(dialog, style="DC.TFrame")
         shape_frame.pack(anchor="w", padx=20, fill="x")
         shape_var = tk.StringVar(value=s["shape_type"] if s["shape_type"] else "round")
-        ttk.Radiobutton(shape_frame, text="🔵 Круглий", variable=shape_var, value="round").pack(side="left", padx=(0, 15))
-        ttk.Radiobutton(shape_frame, text="🟦 Прямокутний", variable=shape_var, value="rect").pack(side="left")
+        ttk.Radiobutton(shape_frame, text="🔵 Круглий", variable=shape_var, value="round").pack(
+            side="left", padx=(0, 15)
+        )
+        ttk.Radiobutton(shape_frame, text="🟦 Прямокутний", variable=shape_var, value="rect").pack(
+            side="left"
+        )
 
         ttk.Label(dialog, text="Формула розгортки:").pack(anchor="w", padx=20, pady=(10, 5))
         formula_entry = ttk.Entry(dialog, width=50)
@@ -1475,12 +1825,23 @@ class DetailCalculatorFrame(tk.Frame):
             flange_formula = flange_entry.get().strip() if has_flange_var.get() else None
             db = get_calc_db()
             c = db.cursor()
-            c.execute("""
+            c.execute(
+                """
                 UPDATE product_subtypes
                 SET name=?, formula=?, shape_type=?, flange_perimeter_formula=?, waste_factor=?, labor_norm=?, description=?
                 WHERE id=?
-            """, (name, formula, shape_var.get(), flange_formula, float(waste_entry.get() or 1.18),
-                  float(labor_entry.get() or 0.5), desc_entry.get(), subtype_id))
+            """,
+                (
+                    name,
+                    formula,
+                    shape_var.get(),
+                    flange_formula,
+                    float(waste_entry.get() or 1.18),
+                    float(labor_entry.get() or 0.5),
+                    desc_entry.get(),
+                    subtype_id,
+                ),
+            )
             db.commit()
             db.close()
             dialog.destroy()
@@ -1491,7 +1852,7 @@ class DetailCalculatorFrame(tk.Frame):
         ttk.Button(dialog, text="Зберегти зміни", command=save).pack(pady=15)
 
     def add_size_dialog(self):
-        if not hasattr(self, 'current_subtype_id') or not self.current_subtype_id:
+        if not hasattr(self, "current_subtype_id") or not self.current_subtype_id:
             messagebox.showwarning("Увага", "Спочатку виберіть підтип")
             return
 
@@ -1534,7 +1895,9 @@ class DetailCalculatorFrame(tk.Frame):
         unit_entry.insert(0, "мм")
         unit_entry.pack(side="left", padx=5)
 
-        ttk.Label(dialog, text="Конкретні значення (через кому, або залиште порожнім):").pack(anchor="w", padx=20, pady=(10, 5))
+        ttk.Label(dialog, text="Конкретні значення (через кому, або залиште порожнім):").pack(
+            anchor="w", padx=20, pady=(10, 5)
+        )
         vals_entry = ttk.Entry(dialog, width=50)
         vals_entry.insert(0, "80,100,125,160,200,250,315")
         vals_entry.pack(fill="x", padx=20)
@@ -1546,14 +1909,27 @@ class DetailCalculatorFrame(tk.Frame):
                 messagebox.showwarning("Увага", "Заповніть параметр та підпис")
                 return
             vals_text = vals_entry.get().strip()
-            vals_json = json.dumps([float(v.strip()) for v in vals_text.split(",")]) if vals_text else None
+            vals_json = (
+                json.dumps([float(v.strip()) for v in vals_text.split(",")]) if vals_text else None
+            )
             db = get_calc_db()
             c = db.cursor()
-            c.execute("""
+            c.execute(
+                """
                 INSERT INTO size_ranges (subtype_id, param_name, param_label, min_value, max_value, step, unit, values_json)
                 VALUES (?,?,?,?,?,?,?,?)
-            """, (self.current_subtype_id, param, label, float(min_entry.get() or 0),
-                  float(max_entry.get() or 0), float(step_entry.get() or 1), unit_entry.get(), vals_json))
+            """,
+                (
+                    self.current_subtype_id,
+                    param,
+                    label,
+                    float(min_entry.get() or 0),
+                    float(max_entry.get() or 0),
+                    float(step_entry.get() or 1),
+                    unit_entry.get(),
+                    vals_json,
+                ),
+            )
             db.commit()
             db.close()
             dialog.destroy()
@@ -1620,7 +1996,9 @@ class DetailCalculatorFrame(tk.Frame):
         unit_entry.insert(0, sz["unit"] or "мм")
         unit_entry.pack(side="left", padx=5)
 
-        ttk.Label(dialog, text="Конкретні значення (через кому, або залиште порожнім):").pack(anchor="w", padx=20, pady=(10, 5))
+        ttk.Label(dialog, text="Конкретні значення (через кому, або залиште порожнім):").pack(
+            anchor="w", padx=20, pady=(10, 5)
+        )
         vals_entry = ttk.Entry(dialog, width=50)
         if sz["values_json"]:
             vals = json.loads(sz["values_json"])
@@ -1634,15 +2012,28 @@ class DetailCalculatorFrame(tk.Frame):
                 messagebox.showwarning("Увага", "Заповніть параметр та підпис")
                 return
             vals_text = vals_entry.get().strip()
-            vals_json = json.dumps([float(v.strip()) for v in vals_text.split(",")]) if vals_text else None
+            vals_json = (
+                json.dumps([float(v.strip()) for v in vals_text.split(",")]) if vals_text else None
+            )
             db = get_calc_db()
             c = db.cursor()
-            c.execute("""
+            c.execute(
+                """
                 UPDATE size_ranges
                 SET param_name=?, param_label=?, min_value=?, max_value=?, step=?, unit=?, values_json=?
                 WHERE id=?
-            """, (param, label, float(min_entry.get() or 0),
-                  float(max_entry.get() or 0), float(step_entry.get() or 1), unit_entry.get(), vals_json, sz["id"]))
+            """,
+                (
+                    param,
+                    label,
+                    float(min_entry.get() or 0),
+                    float(max_entry.get() or 0),
+                    float(step_entry.get() or 1),
+                    unit_entry.get(),
+                    vals_json,
+                    sz["id"],
+                ),
+            )
             db.commit()
             db.close()
             dialog.destroy()
@@ -1651,7 +2042,8 @@ class DetailCalculatorFrame(tk.Frame):
             messagebox.showinfo("Готово", "Розмірний ряд оновлено!")
 
         ttk.Button(dialog, text="Зберегти зміни", command=save).pack(pady=15)
-# ═══════════════════════════════════════════════
+
+    # ═══════════════════════════════════════════════
     #  МАТЕРІАЛИ
     # ═══════════════════════════════════════════════
     def delete_size(self):
@@ -1669,12 +2061,15 @@ class DetailCalculatorFrame(tk.Frame):
             except Exception as e:
                 messagebox.showerror("Помилка", str(e))
 
-
     def build_materials(self):
-        ttk.Label(self.materials_frame, text="Довідник матеріалів", style="DC.Title.TLabel").pack(anchor="w", padx=15, pady=(15, 10))
+        ttk.Label(self.materials_frame, text="Довідник матеріалів", style="DC.Title.TLabel").pack(
+            anchor="w", padx=15, pady=(15, 10)
+        )
 
         columns = ("id", "Назва", "Марка", "Товщина", "Ціна м²", "Відходи")
-        self.mat_tree = ttk.Treeview(self.materials_frame, columns=columns, show="headings", height=15, style="DC.Treeview")
+        self.mat_tree = ttk.Treeview(
+            self.materials_frame, columns=columns, show="headings", height=15, style="DC.Treeview"
+        )
         for col in columns:
             self.mat_tree.heading(col, text=col)
         self.mat_tree.column("id", width=50, anchor="center")
@@ -1691,9 +2086,15 @@ class DetailCalculatorFrame(tk.Frame):
 
         btn_frame = ttk.Frame(self.materials_frame, style="DC.TFrame")
         btn_frame.pack(fill="x", padx=15, pady=10)
-        ttk.Button(btn_frame, text="➕ Додати матеріал", command=self.add_material_dialog).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="✏️ Редагувати", command=self.edit_material_dialog).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="🗑 Видалити", command=self.delete_material).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="➕ Додати матеріал", command=self.add_material_dialog).pack(
+            side="left", padx=5
+        )
+        ttk.Button(btn_frame, text="✏️ Редагувати", command=self.edit_material_dialog).pack(
+            side="left", padx=5
+        )
+        ttk.Button(btn_frame, text="🗑 Видалити", command=self.delete_material).pack(
+            side="left", padx=5
+        )
 
         self.load_materials_data()
 
@@ -1701,12 +2102,22 @@ class DetailCalculatorFrame(tk.Frame):
         for row in self.mat_tree.get_children():
             self.mat_tree.delete(row)
         db = get_calc_db()
-        mats = db.execute("SELECT * FROM calc_materials WHERE is_active=1 ORDER BY name, thickness").fetchall()
+        mats = db.execute(
+            "SELECT * FROM calc_materials WHERE is_active=1 ORDER BY name, thickness"
+        ).fetchall()
         for m in mats:
-            self.mat_tree.insert("", "end", values=(
-                m["id"], m["name"], m["grade"] or "—", f"{m['thickness']} мм",
-                f"{m['price_per_m2']} грн", m["waste_factor"]
-            ))
+            self.mat_tree.insert(
+                "",
+                "end",
+                values=(
+                    m["id"],
+                    m["name"],
+                    m["grade"] or "—",
+                    f"{m['thickness']} мм",
+                    f"{m['price_per_m2']} грн",
+                    m["waste_factor"],
+                ),
+            )
 
     def add_material_dialog(self):
         dialog = tk.Toplevel(self)
@@ -1734,18 +2145,26 @@ class DetailCalculatorFrame(tk.Frame):
         def save():
             db = get_calc_db()
             c = db.cursor()
-            c.execute("""
+            c.execute(
+                """
                 INSERT INTO calc_materials (name, grade, thickness, price_per_m2, waste_factor)
                 VALUES (?,?,?,?,?)
-            """, (entries["name"].get(), entries["grade"].get() or None,
-                  float(entries["thickness"].get() or 0.5),
-                  float(entries["price"].get() or 0),
-                  float(entries["waste"].get() or 1.18)))
+            """,
+                (
+                    entries["name"].get(),
+                    entries["grade"].get() or None,
+                    float(entries["thickness"].get() or 0.5),
+                    float(entries["price"].get() or 0),
+                    float(entries["waste"].get() or 1.18),
+                ),
+            )
             mat_id = c.lastrowid
             subtypes = c.execute("SELECT id FROM product_subtypes WHERE is_active=1").fetchall()
             for st in subtypes:
-                c.execute("INSERT OR IGNORE INTO subtype_materials (subtype_id, material_id, is_default) VALUES (?,?,0)",
-                         (st["id"], mat_id))
+                c.execute(
+                    "INSERT OR IGNORE INTO subtype_materials (subtype_id, material_id, is_default) VALUES (?,?,0)",
+                    (st["id"], mat_id),
+                )
             db.commit()
             db.close()
             dialog.destroy()
@@ -1806,11 +2225,14 @@ class DetailCalculatorFrame(tk.Frame):
 
             db = get_calc_db()
             c = db.cursor()
-            c.execute("""
+            c.execute(
+                """
                 UPDATE calc_materials
                 SET name=?, grade=?, thickness=?, price_per_m2=?, waste_factor=?
                 WHERE id=?
-            """, (name, entries["grade"].get() or None, thickness, price, waste, mat_id))
+            """,
+                (name, entries["grade"].get() or None, thickness, price, waste, mat_id),
+            )
             db.commit()
             db.close()
             dialog.destroy()
@@ -1837,13 +2259,22 @@ class DetailCalculatorFrame(tk.Frame):
     #  НАКЛАДНІ ВИТРАТИ
     # ═══════════════════════════════════════════════
     def build_overhead(self):
-        ttk.Label(self.overhead_frame, text="Накладні витрати", style="DC.Title.TLabel").pack(anchor="w", padx=15, pady=(15, 5))
+        ttk.Label(self.overhead_frame, text="Накладні витрати", style="DC.Title.TLabel").pack(
+            anchor="w", padx=15, pady=(15, 5)
+        )
 
-        info = ttk.Label(self.overhead_frame, text="Тип 'фіксована' = грн на місяць (розподіляється на кожен виріб). Тип 'відсоток' = % від (матеріал + робота).",
-                         font=("Segoe UI", 10), foreground="#666", wraplength=900)
+        info = ttk.Label(
+            self.overhead_frame,
+            text="Тип 'фіксована' = грн на місяць (розподіляється на кожен виріб). Тип 'відсоток' = % від (матеріал + робота).",
+            font=("Segoe UI", 10),
+            foreground="#666",
+            wraplength=900,
+        )
         info.pack(anchor="w", padx=15, pady=(0, 10))
 
-        plan_frame = ttk.LabelFrame(self.overhead_frame, text="План виробництва", padding=10, style="DC.Card.TLabelframe")
+        plan_frame = ttk.LabelFrame(
+            self.overhead_frame, text="План виробництва", padding=10, style="DC.Card.TLabelframe"
+        )
         plan_frame.pack(fill="x", padx=15, pady=(0, 10))
 
         ttk.Label(plan_frame, text="Кількість виробів на місяць:").pack(side="left", padx=5)
@@ -1851,9 +2282,13 @@ class DetailCalculatorFrame(tk.Frame):
         self.monthly_qty.insert(0, "100")
         self.monthly_qty.pack(side="left", padx=5)
         ttk.Label(plan_frame, text="шт").pack(side="left")
-        ttk.Button(plan_frame, text="💾 Зберегти", command=self.save_monthly_qty).pack(side="left", padx=(20, 5))
+        ttk.Button(plan_frame, text="💾 Зберегти", command=self.save_monthly_qty).pack(
+            side="left", padx=(20, 5)
+        )
 
-        flange_frame = ttk.LabelFrame(self.overhead_frame, text="Матеріали фланця", padding=10, style="DC.Card.TLabelframe")
+        flange_frame = ttk.LabelFrame(
+            self.overhead_frame, text="Матеріали фланця", padding=10, style="DC.Card.TLabelframe"
+        )
         flange_frame.pack(fill="x", padx=15, pady=(0, 10))
 
         ttk.Label(flange_frame, text="Шинорейка (грн/м):").pack(side="left", padx=5)
@@ -1865,10 +2300,14 @@ class DetailCalculatorFrame(tk.Frame):
         ttk.Label(flange_frame, text="Відходи:").pack(side="left", padx=(15, 5))
         self.flange_waste = ttk.Entry(flange_frame, width=8)
         self.flange_waste.pack(side="left", padx=5)
-        ttk.Button(flange_frame, text="💾 Зберегти", command=self.save_flange_prices).pack(side="left", padx=(20, 5))
+        ttk.Button(flange_frame, text="💾 Зберегти", command=self.save_flange_prices).pack(
+            side="left", padx=(20, 5)
+        )
 
         columns = ("id", "Назва статті", "Тип", "Значення", "Примітка")
-        self.overhead_tree = ttk.Treeview(self.overhead_frame, columns=columns, show="headings", height=10, style="DC.Treeview")
+        self.overhead_tree = ttk.Treeview(
+            self.overhead_frame, columns=columns, show="headings", height=10, style="DC.Treeview"
+        )
         for col in columns:
             self.overhead_tree.heading(col, text=col)
         self.overhead_tree.column("id", width=50, anchor="center")
@@ -1878,15 +2317,23 @@ class DetailCalculatorFrame(tk.Frame):
         self.overhead_tree.column("Примітка", width=300)
         self.overhead_tree.pack(fill="both", expand=True, padx=15, pady=5)
 
-        vsb = ttk.Scrollbar(self.overhead_frame, orient="vertical", command=self.overhead_tree.yview)
+        vsb = ttk.Scrollbar(
+            self.overhead_frame, orient="vertical", command=self.overhead_tree.yview
+        )
         self.overhead_tree.configure(yscrollcommand=vsb.set)
         vsb.pack(side="right", fill="y", padx=(0, 15))
 
         btn_frame = ttk.Frame(self.overhead_frame, style="DC.TFrame")
         btn_frame.pack(fill="x", padx=15, pady=10)
-        ttk.Button(btn_frame, text="➕ Додати статтю", command=self.add_overhead_dialog).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="✏️ Редагувати", command=self.edit_overhead_dialog).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="🗑 Видалити", command=self.delete_overhead).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="➕ Додати статтю", command=self.add_overhead_dialog).pack(
+            side="left", padx=5
+        )
+        ttk.Button(btn_frame, text="✏️ Редагувати", command=self.edit_overhead_dialog).pack(
+            side="left", padx=5
+        )
+        ttk.Button(btn_frame, text="🗑 Видалити", command=self.delete_overhead).pack(
+            side="left", padx=5
+        )
 
         self.overhead_summary = ttk.Label(self.overhead_frame, text="", font=("Segoe UI", 12))
         self.overhead_summary.pack(anchor="w", padx=15, pady=10)
@@ -1911,12 +2358,17 @@ class DetailCalculatorFrame(tk.Frame):
             else:
                 note = f"{it['value']}% від (матеріал + робота)"
                 total_percent += it["value"]
-            self.overhead_tree.insert("", "end", values=(
-                it["id"], it["name"],
-                "Фіксована" if it["type"] == "fixed" else "Відсоток",
-                f"{it['value']} {'грн' if it['type'] == 'fixed' else '%'}",
-                note
-            ))
+            self.overhead_tree.insert(
+                "",
+                "end",
+                values=(
+                    it["id"],
+                    it["name"],
+                    "Фіксована" if it["type"] == "fixed" else "Відсоток",
+                    f"{it['value']} {'грн' if it['type'] == 'fixed' else '%'}",
+                    note,
+                ),
+            )
 
         self.overhead_summary.config(
             text=f"Всього фіксованих: {total_fixed} грн/міс  |  Всього відсоткових: {total_percent}%  |  План: {monthly} шт/міс"
@@ -1929,7 +2381,10 @@ class DetailCalculatorFrame(tk.Frame):
             return
         db = get_calc_db()
         c = db.cursor()
-        c.execute("INSERT OR REPLACE INTO calc_settings (key, value) VALUES (?,?)", ("monthly_products", val))
+        c.execute(
+            "INSERT OR REPLACE INTO calc_settings (key, value) VALUES (?,?)",
+            ("monthly_products", val),
+        )
         self.load_overhead_data()
         messagebox.showinfo("Готово", f"Планова кількість виробів: {val} шт/міс")
 
@@ -1993,8 +2448,15 @@ class DetailCalculatorFrame(tk.Frame):
         type_var = tk.StringVar(value=item["type"])
         type_frame = ttk.Frame(dialog, style="DC.TFrame")
         type_frame.pack(anchor="w", padx=20)
-        ttk.Radiobutton(type_frame, text="Фіксована сума (грн/міс)", variable=type_var, value="fixed").pack(anchor="w")
-        ttk.Radiobutton(type_frame, text="Відсоток (% від матеріал + робота)", variable=type_var, value="percent").pack(anchor="w")
+        ttk.Radiobutton(
+            type_frame, text="Фіксована сума (грн/міс)", variable=type_var, value="fixed"
+        ).pack(anchor="w")
+        ttk.Radiobutton(
+            type_frame,
+            text="Відсоток (% від матеріал + робота)",
+            variable=type_var,
+            value="percent",
+        ).pack(anchor="w")
 
         ttk.Label(dialog, text="Значення:").pack(anchor="w", padx=20, pady=(10, 5))
         val_entry = ttk.Entry(dialog, width=20)
@@ -2008,8 +2470,10 @@ class DetailCalculatorFrame(tk.Frame):
                 return
             db = get_calc_db()
             c = db.cursor()
-            c.execute("UPDATE overhead_items SET name=?, type=?, value=? WHERE id=?",
-                     (name, type_var.get(), float(val_entry.get() or 0), oh_id))
+            c.execute(
+                "UPDATE overhead_items SET name=?, type=?, value=? WHERE id=?",
+                (name, type_var.get(), float(val_entry.get() or 0), oh_id),
+            )
             db.commit()
             db.close()
             dialog.destroy()
@@ -2034,8 +2498,15 @@ class DetailCalculatorFrame(tk.Frame):
         type_var = tk.StringVar(value="fixed")
         type_frame = ttk.Frame(dialog, style="DC.TFrame")
         type_frame.pack(anchor="w", padx=20)
-        ttk.Radiobutton(type_frame, text="Фіксована сума (грн/міс)", variable=type_var, value="fixed").pack(anchor="w")
-        ttk.Radiobutton(type_frame, text="Відсоток (% від матеріал + робота)", variable=type_var, value="percent").pack(anchor="w")
+        ttk.Radiobutton(
+            type_frame, text="Фіксована сума (грн/міс)", variable=type_var, value="fixed"
+        ).pack(anchor="w")
+        ttk.Radiobutton(
+            type_frame,
+            text="Відсоток (% від матеріал + робота)",
+            variable=type_var,
+            value="percent",
+        ).pack(anchor="w")
 
         ttk.Label(dialog, text="Значення:").pack(anchor="w", padx=20, pady=(10, 5))
         val_entry = ttk.Entry(dialog, width=20)
@@ -2049,8 +2520,10 @@ class DetailCalculatorFrame(tk.Frame):
                 return
             db = get_calc_db()
             c = db.cursor()
-            c.execute("INSERT INTO overhead_items (name, type, value) VALUES (?,?,?)",
-                     (name, type_var.get(), float(val_entry.get() or 0)))
+            c.execute(
+                "INSERT INTO overhead_items (name, type, value) VALUES (?,?,?)",
+                (name, type_var.get(), float(val_entry.get() or 0)),
+            )
             db.commit()
             db.close()
             dialog.destroy()
@@ -2068,14 +2541,19 @@ class DetailCalculatorFrame(tk.Frame):
             return
         OverheadRepo.delete(int(oh_id))
         self.load_overhead_data()
-# ═══════════════════════════════════════════════
+
+    # ═══════════════════════════════════════════════
     #  ІСТОРІЯ КП
     # ═══════════════════════════════════════════════
     def build_history(self):
-        ttk.Label(self.history_frame, text="Історія комерційних пропозицій", style="DC.Title.TLabel").pack(anchor="w", padx=15, pady=(15, 10))
+        ttk.Label(
+            self.history_frame, text="Історія комерційних пропозицій", style="DC.Title.TLabel"
+        ).pack(anchor="w", padx=15, pady=(15, 10))
 
         columns = ("id", "Клієнт", "Дата", "Режим", "Собівартість", "Ціна продажу", "Статус")
-        self.hist_tree = ttk.Treeview(self.history_frame, columns=columns, show="headings", height=15, style="DC.Treeview")
+        self.hist_tree = ttk.Treeview(
+            self.history_frame, columns=columns, show="headings", height=15, style="DC.Treeview"
+        )
         for col in columns:
             self.hist_tree.heading(col, text=col)
         self.hist_tree.column("id", width=60, anchor="center")
@@ -2092,16 +2570,27 @@ class DetailCalculatorFrame(tk.Frame):
         self.hist_tree.configure(yscrollcommand=vsb.set)
         vsb.pack(side="right", fill="y", padx=(0, 15))
 
-        self.hist_detail = tk.Text(self.history_frame, height=10, wrap="word", font=("Segoe UI", 10),
-                                    bg="#fafafa", relief="solid", borderwidth=1)
+        self.hist_detail = tk.Text(
+            self.history_frame,
+            height=10,
+            wrap="word",
+            font=("Segoe UI", 10),
+            bg="#fafafa",
+            relief="solid",
+            borderwidth=1,
+        )
         self.hist_detail.pack(fill="x", padx=15, pady=10)
         self.hist_detail.config(state="disabled")
 
         btn_frame = ttk.Frame(self.history_frame, style="DC.TFrame")
         btn_frame.pack(fill="x", padx=15, pady=5)
-        ttk.Button(btn_frame, text="📊 Excel", command=self.export_history_xlsx).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="📊 Excel", command=self.export_history_xlsx).pack(
+            side="left", padx=5
+        )
         ttk.Button(btn_frame, text="🖨️ Друк", command=self.print_history).pack(side="left", padx=5)
-        ttk.Button(btn_frame, text="🗑 Видалити КП", command=self.delete_calculation).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="🗑 Видалити КП", command=self.delete_calculation).pack(
+            side="left", padx=5
+        )
 
         self.load_history_data()
 
@@ -2110,10 +2599,19 @@ class DetailCalculatorFrame(tk.Frame):
             self.hist_tree.delete(row)
         calcs = CalcRepo.get_all_calculations()
         for c in calcs:
-            self.hist_tree.insert("", "end", values=(
-                c["id"], c["client_name"] or "—", c["created_at"], "—",
-                f"{c['total_cost']:.2f} грн", f"{c['sale_price']:.2f} грн", c["status"]
-            ))
+            self.hist_tree.insert(
+                "",
+                "end",
+                values=(
+                    c["id"],
+                    c["client_name"] or "—",
+                    c["created_at"],
+                    "—",
+                    f"{c['total_cost']:.2f} грн",
+                    f"{c['sale_price']:.2f} грн",
+                    c["status"],
+                ),
+            )
 
     def on_history_select(self, event=None):
         selected = self.hist_tree.selection()
@@ -2123,22 +2621,25 @@ class DetailCalculatorFrame(tk.Frame):
 
         db = get_calc_db()
         calc = db.execute("SELECT * FROM calc_calculations WHERE id=?", (calc_id,)).fetchone()
-        items = db.execute("""
+        items = db.execute(
+            """
             SELECT ci.*, ps.name as subtype_name, m.name as material_name, m.thickness
             FROM calc_items ci
             JOIN product_subtypes ps ON ci.subtype_id = ps.id
             JOIN calc_materials m ON ci.material_id = m.id
             WHERE ci.calculation_id = ?
-        """, (calc_id,)).fetchall()
+        """,
+            (calc_id,),
+        ).fetchall()
 
         text = f"КП №{calc_id}  |  Клієнт: {calc['client_name'] or '—'}  |  Дата: {calc['created_at']}\n"
         text += f"Собівартість: {calc['total_cost']:.2f} грн  |  Ціна продажу: {calc['sale_price']:.2f} грн\n"
         text += "=" * 60 + "\n\n"
         for i, it in enumerate(items, 1):
             text += f"{i}. {it['subtype_name']} — {it['material_name']} {it['thickness']} мм\n"
-            sizes_str = format_size_params(it['size_params'], it['subtype_id'])
+            sizes_str = format_size_params(it["size_params"], it["subtype_id"])
             text += f"   Розміри: {sizes_str}  |  К-ть: {it['quantity']}\n"
-            if (it['flange_cost'] or 0) > 0:
+            if (it["flange_cost"] or 0) > 0:
                 text += f"   Фланець: {it['flange_cost']:.2f} грн\n"
             text += f"   Площа: {it['area_m2']:.3f} м²  |  Ціна: {it['unit_price']:.2f} грн  |  Сума: {it['total_price']:.2f} грн\n\n"
 
@@ -2177,11 +2678,15 @@ class DetailCalculatorFrame(tk.Frame):
     #  ФІНАНСИ
     # ═══════════════════════════════════════════════
     def build_finances(self):
-        report_frame = ttk.LabelFrame(self.finances_frame, text="📊 Періодичний звіт", padding=10, style="DC.Card.TLabelframe")
+        report_frame = ttk.LabelFrame(
+            self.finances_frame, text="📊 Періодичний звіт", padding=10, style="DC.Card.TLabelframe"
+        )
         report_frame.pack(fill="x", padx=15, pady=(10, 5))
 
         ttk.Label(report_frame, text="Період:").pack(side="left", padx=5)
-        self.period_combo = ttk.Combobox(report_frame, values=["Місяць", "Квартал", "Рік"], state="readonly", width=12)
+        self.period_combo = ttk.Combobox(
+            report_frame, values=["Місяць", "Квартал", "Рік"], state="readonly", width=12
+        )
         self.period_combo.current(0)
         self.period_combo.pack(side="left", padx=5)
         self.period_combo.bind("<<ComboboxSelected>>", self.on_period_change)
@@ -2195,12 +2700,16 @@ class DetailCalculatorFrame(tk.Frame):
         self.period_year.insert(0, str(datetime.now().year))
         self.period_year.pack(side="left", padx=5)
 
-        ttk.Button(report_frame, text="📈 Сформувати звіт", command=self.build_period_report).pack(side="left", padx=(20, 5))
+        ttk.Button(report_frame, text="📈 Сформувати звіт", command=self.build_period_report).pack(
+            side="left", padx=(20, 5)
+        )
 
         self.period_result_frame = ttk.Frame(self.finances_frame, style="DC.TFrame")
         self.period_result_frame.pack(fill="x", padx=15, pady=5)
 
-        ttk.Label(self.finances_frame, text="💰 Фінансовий аналіз КП", style="DC.Title.TLabel").pack(anchor="w", padx=15, pady=(15, 10))
+        ttk.Label(
+            self.finances_frame, text="💰 Фінансовий аналіз КП", style="DC.Title.TLabel"
+        ).pack(anchor="w", padx=15, pady=(15, 10))
 
         select_frame = ttk.Frame(self.finances_frame, style="DC.TFrame")
         select_frame.pack(fill="x", padx=15, pady=5)
@@ -2208,13 +2717,30 @@ class DetailCalculatorFrame(tk.Frame):
         self.fin_calc_combo = ttk.Combobox(select_frame, state="readonly", width=60)
         self.fin_calc_combo.pack(side="left", padx=5, fill="x", expand=True)
         self.fin_calc_combo.bind("<<ComboboxSelected>>", self.on_fin_calc_select)
-        ttk.Button(select_frame, text="🔄 Оновити", command=self.load_finances_data).pack(side="left", padx=5)
+        ttk.Button(select_frame, text="🔄 Оновити", command=self.load_finances_data).pack(
+            side="left", padx=5
+        )
 
-        table_frame = ttk.LabelFrame(self.finances_frame, text="Позиції КП", padding=10, style="DC.Card.TLabelframe")
+        table_frame = ttk.LabelFrame(
+            self.finances_frame, text="Позиції КП", padding=10, style="DC.Card.TLabelframe"
+        )
         table_frame.pack(fill="both", expand=True, padx=15, pady=5)
 
-        columns = ("№", "Виріб", "К-ть", "Площа м² (загальна)", "Метал грн", "Фланець грн", "Робота грн", "Накладні грн", "Собівартість грн", "Ціна продажу грн")
-        self.fin_tree = ttk.Treeview(table_frame, columns=columns, show="headings", height=8, style="DC.Treeview")
+        columns = (
+            "№",
+            "Виріб",
+            "К-ть",
+            "Площа м² (загальна)",
+            "Метал грн",
+            "Фланець грн",
+            "Робота грн",
+            "Накладні грн",
+            "Собівартість грн",
+            "Ціна продажу грн",
+        )
+        self.fin_tree = ttk.Treeview(
+            table_frame, columns=columns, show="headings", height=8, style="DC.Treeview"
+        )
         for col in columns:
             self.fin_tree.heading(col, text=col)
             self.fin_tree.column(col, width=100, anchor="center")
@@ -2229,7 +2755,9 @@ class DetailCalculatorFrame(tk.Frame):
         bottom = ttk.Frame(self.finances_frame, style="DC.TFrame")
         bottom.pack(fill="both", expand=False, padx=15, pady=10)
 
-        left_summary = ttk.LabelFrame(bottom, text="📊 Підсумки витрат", padding=15, style="DC.Card.TLabelframe")
+        left_summary = ttk.LabelFrame(
+            bottom, text="📊 Підсумки витрат", padding=15, style="DC.Card.TLabelframe"
+        )
         left_summary.pack(side="left", fill="both", expand=True, padx=(0, 10))
 
         self.fin_metal = ttk.Label(left_summary, text="—", font=("Segoe UI", 12, "bold"))
@@ -2248,14 +2776,18 @@ class DetailCalculatorFrame(tk.Frame):
         self.fin_overhead.pack(anchor="w", pady=(10, 2))
         ttk.Label(left_summary, text="Накладні витрати", foreground="#666").pack(anchor="w")
 
-        right_summary = ttk.LabelFrame(bottom, text="💰 Фінансовий результат", padding=15, style="DC.Card.TLabelframe")
+        right_summary = ttk.LabelFrame(
+            bottom, text="💰 Фінансовий результат", padding=15, style="DC.Card.TLabelframe"
+        )
         right_summary.pack(side="right", fill="both", expand=True, padx=(10, 0))
 
         self.fin_cost = ttk.Label(right_summary, text="—", font=("Segoe UI", 14, "bold"))
         self.fin_cost.pack(anchor="w", pady=2)
         ttk.Label(right_summary, text="Собівартість", foreground="#666").pack(anchor="w")
 
-        self.fin_sale = ttk.Label(right_summary, text="—", font=("Segoe UI", 14, "bold"), foreground="#16a34a")
+        self.fin_sale = ttk.Label(
+            right_summary, text="—", font=("Segoe UI", 14, "bold"), foreground="#16a34a"
+        )
         self.fin_sale.pack(anchor="w", pady=(10, 2))
         ttk.Label(right_summary, text="Ціна продажу", foreground="#666").pack(anchor="w")
 
@@ -2267,7 +2799,9 @@ class DetailCalculatorFrame(tk.Frame):
         self.fin_margin.pack(anchor="w", pady=(10, 2))
         ttk.Label(right_summary, text="Маржа", foreground="#666").pack(anchor="w")
 
-        mat_frame = ttk.LabelFrame(self.finances_frame, text="📐 Розхід матеріалу", padding=10, style="DC.Card.TLabelframe")
+        mat_frame = ttk.LabelFrame(
+            self.finances_frame, text="📐 Розхід матеріалу", padding=10, style="DC.Card.TLabelframe"
+        )
         mat_frame.pack(fill="x", padx=15, pady=(0, 10))
 
         self.fin_area_pure = ttk.Label(mat_frame, text="—", font=("Segoe UI", 12, "bold"))
@@ -2276,19 +2810,28 @@ class DetailCalculatorFrame(tk.Frame):
 
         self.fin_area_waste = ttk.Label(mat_frame, text="—", font=("Segoe UI", 12, "bold"))
         self.fin_area_waste.pack(side="left", padx=(5, 20))
-        ttk.Label(mat_frame, text="Площа з відходами", foreground="#666").pack(side="left", padx=(0, 30))
+        ttk.Label(mat_frame, text="Площа з відходами", foreground="#666").pack(
+            side="left", padx=(0, 30)
+        )
 
         self.fin_mat_cost = ttk.Label(mat_frame, text="—", font=("Segoe UI", 12, "bold"))
         self.fin_mat_cost.pack(side="left", padx=(5, 20))
         ttk.Label(mat_frame, text="Вартість матеріалу", foreground="#666").pack(side="left")
 
-        edit_frame = ttk.LabelFrame(self.finances_frame, text="✏️ Коригування націнки", padding=10, style="DC.Card.TLabelframe")
+        edit_frame = ttk.LabelFrame(
+            self.finances_frame,
+            text="✏️ Коригування націнки",
+            padding=10,
+            style="DC.Card.TLabelframe",
+        )
         edit_frame.pack(fill="x", padx=15, pady=(0, 10))
 
         ttk.Label(edit_frame, text="Націнка (%):").pack(side="left", padx=5)
         self.fin_markup = ttk.Entry(edit_frame, width=10)
         self.fin_markup.pack(side="left", padx=5)
-        ttk.Button(edit_frame, text="💾 Перерахувати і зберегти", command=self.recalc_finances).pack(side="left", padx=(20, 5))
+        ttk.Button(
+            edit_frame, text="💾 Перерахувати і зберегти", command=self.recalc_finances
+        ).pack(side="left", padx=(20, 5))
 
         self.load_finances_data()
         self.on_period_change()
@@ -2296,11 +2839,28 @@ class DetailCalculatorFrame(tk.Frame):
     def on_period_change(self, event=None):
         period = self.period_combo.get()
         if period == "Місяць":
-            self.period_value["values"] = ["Січень", "Лютий", "Березень", "Квітень", "Травень", "Червень",
-                                              "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень"]
+            self.period_value["values"] = [
+                "Січень",
+                "Лютий",
+                "Березень",
+                "Квітень",
+                "Травень",
+                "Червень",
+                "Липень",
+                "Серпень",
+                "Вересень",
+                "Жовтень",
+                "Листопад",
+                "Грудень",
+            ]
             self.period_value.current(datetime.now().month - 1)
         elif period == "Квартал":
-            self.period_value["values"] = ["Q1 (Січ–Бер)", "Q2 (Кві–Чер)", "Q3 (Лип–Вер)", "Q4 (Жов–Гру)"]
+            self.period_value["values"] = [
+                "Q1 (Січ–Бер)",
+                "Q2 (Кві–Чер)",
+                "Q3 (Лип–Вер)",
+                "Q4 (Жов–Гру)",
+            ]
             q = (datetime.now().month - 1) // 3
             self.period_value.current(q)
         else:
@@ -2319,15 +2879,31 @@ class DetailCalculatorFrame(tk.Frame):
             return
 
         if period == "Місяць":
-            months = ["Січень", "Лютий", "Березень", "Квітень", "Травень", "Червень",
-                      "Липень", "Серпень", "Вересень", "Жовтень", "Листопад", "Грудень"]
+            months = [
+                "Січень",
+                "Лютий",
+                "Березень",
+                "Квітень",
+                "Травень",
+                "Червень",
+                "Липень",
+                "Серпень",
+                "Вересень",
+                "Жовтень",
+                "Листопад",
+                "Грудень",
+            ]
             month = months.index(value) + 1
             start = f"{year:04d}-{month:02d}-01"
             last_day = monthrange(year, month)[1]
             end = f"{year:04d}-{month:02d}-{last_day:02d}"
         elif period == "Квартал":
-            q_map = {"Q1 (Січ–Бер)": (1, 3), "Q2 (Кві–Чер)": (4, 6),
-                     "Q3 (Лип–Вер)": (7, 9), "Q4 (Жов–Гру)": (10, 12)}
+            q_map = {
+                "Q1 (Січ–Бер)": (1, 3),
+                "Q2 (Кві–Чер)": (4, 6),
+                "Q3 (Лип–Вер)": (7, 9),
+                "Q4 (Жов–Гру)": (10, 12),
+            }
             m_start, m_end = q_map.get(value, (1, 3))
             start = f"{year:04d}-{m_start:02d}-01"
             last_day = monthrange(year, m_end)[1]
@@ -2339,11 +2915,14 @@ class DetailCalculatorFrame(tk.Frame):
         db = get_calc_db()
         c = db.cursor()
 
-        calcs = c.execute("""
+        calcs = c.execute(
+            """
             SELECT id, total_cost, sale_price, created_at
             FROM calc_calculations
             WHERE created_at >= ? AND created_at <= ?
-        """, (start, end)).fetchall()
+        """,
+            (start, end),
+        ).fetchall()
 
         if not calcs:
             messagebox.showinfo("Звіт", f"За період {value} {year} КП не знайдено.")
@@ -2353,7 +2932,8 @@ class DetailCalculatorFrame(tk.Frame):
         calc_ids = [row["id"] for row in calcs]
         placeholders = ",".join("?" * len(calc_ids))
 
-        agg = c.execute(f"""
+        agg = c.execute(
+            f"""
             SELECT
                 SUM(quantity) as total_qty,
                 SUM(area_m2 * quantity) as total_area,
@@ -2365,8 +2945,9 @@ class DetailCalculatorFrame(tk.Frame):
                 SUM(total_price) as total_sale
             FROM calc_items
             WHERE calculation_id IN ({placeholders})
-        """, calc_ids).fetchone()
-
+        """,
+            calc_ids,
+        ).fetchone()
 
         total_sale = agg["total_sale"] or 0
         total_cost = agg["total_cost_all"] or 0
@@ -2382,13 +2963,19 @@ class DetailCalculatorFrame(tk.Frame):
         for w in self.period_result_frame.winfo_children():
             w.destroy()
 
-        ttk.Label(self.period_result_frame,
-                  text=f"📈 Звіт за {value.lower()} {year}  |  КП: {len(calc_ids)} шт  |  Виробів: {total_qty} шт",
-                  font=("Segoe UI", 12, "bold")).pack(anchor="w", pady=(0, 5))
+        ttk.Label(
+            self.period_result_frame,
+            text=f"📈 Звіт за {value.lower()} {year}  |  КП: {len(calc_ids)} шт  |  Виробів: {total_qty} шт",
+            font=("Segoe UI", 12, "bold"),
+        ).pack(anchor="w", pady=(0, 5))
 
-        tree = ttk.Treeview(self.period_result_frame,
-                            columns=("Показник", "Значення"),
-                            show="headings", height=8, style="DC.Treeview")
+        tree = ttk.Treeview(
+            self.period_result_frame,
+            columns=("Показник", "Значення"),
+            show="headings",
+            height=8,
+            style="DC.Treeview",
+        )
         tree.heading("Показник", text="Показник")
         tree.heading("Значення", text="Значення")
         tree.column("Показник", width=250, anchor="w")
@@ -2411,7 +2998,9 @@ class DetailCalculatorFrame(tk.Frame):
         ]
 
         for row in data:
-            tag = "bold" if row[0] in ("💰 Виручка (ціна продажу)", "📈 Прибуток", "📊 Маржа") else ""
+            tag = (
+                "bold" if row[0] in ("💰 Виручка (ціна продажу)", "📈 Прибуток", "📊 Маржа") else ""
+            )
             tree.insert("", "end", values=row, tags=(tag,))
 
         tree.tag_configure("bold", font=("Segoe UI", 10, "bold"))
@@ -2420,7 +3009,9 @@ class DetailCalculatorFrame(tk.Frame):
         calcs = CalcRepo.get_all_calculations()
 
         self.fin_calcs = [dict(c) for c in calcs]
-        self.fin_calc_combo["values"] = [f"КП №{c['id']} — {c['client_name'] or '—'} — {c['created_at']}" for c in self.fin_calcs]
+        self.fin_calc_combo["values"] = [
+            f"КП №{c['id']} — {c['client_name'] or '—'} — {c['created_at']}" for c in self.fin_calcs
+        ]
 
         if self.fin_calcs:
             self.fin_calc_combo.current(0)
@@ -2435,13 +3026,16 @@ class DetailCalculatorFrame(tk.Frame):
         self.current_fin_calc_id = calc["id"]
 
         db = get_calc_db()
-        items = db.execute("""
+        items = db.execute(
+            """
             SELECT ci.*, ps.name as subtype_name, m.name as material_name, m.thickness, m.price_per_m2
             FROM calc_items ci
             JOIN product_subtypes ps ON ci.subtype_id = ps.id
             JOIN calc_materials m ON ci.material_id = m.id
             WHERE ci.calculation_id = ?
-        """, (calc["id"],)).fetchall()
+        """,
+            (calc["id"],),
+        ).fetchall()
 
         for row in self.fin_tree.get_children():
             self.fin_tree.delete(row)
@@ -2458,7 +3052,7 @@ class DetailCalculatorFrame(tk.Frame):
         for i, it in enumerate(items, 1):
             qty = it["quantity"]
             mat_unit = it["material_cost"]
-            flange_unit = (it["flange_cost"] if it["flange_cost"] else 0)
+            flange_unit = it["flange_cost"] if it["flange_cost"] else 0
             metal_unit = mat_unit - flange_unit
 
             metal = metal_unit * qty
@@ -2480,12 +3074,22 @@ class DetailCalculatorFrame(tk.Frame):
             total_area_pure += area_pure
             total_area_waste += area_waste
 
-            self.fin_tree.insert("", "end", values=(
-                i, it["subtype_name"], qty,
-                f"{it['area_m2'] * qty:.3f}",
-                f"{metal:.2f}", f"{flange:.2f}", f"{labor:.2f}", f"{overhead:.2f}",
-                f"{cost:.2f}", f"{sale:.2f}"
-            ))
+            self.fin_tree.insert(
+                "",
+                "end",
+                values=(
+                    i,
+                    it["subtype_name"],
+                    qty,
+                    f"{it['area_m2'] * qty:.3f}",
+                    f"{metal:.2f}",
+                    f"{flange:.2f}",
+                    f"{labor:.2f}",
+                    f"{overhead:.2f}",
+                    f"{cost:.2f}",
+                    f"{sale:.2f}",
+                ),
+            )
 
         self.fin_metal.config(text=f"{total_metal:.2f} грн")
         self.fin_flange.config(text=f"{total_flange:.2f} грн")
@@ -2495,7 +3099,9 @@ class DetailCalculatorFrame(tk.Frame):
         self.fin_cost.config(text=f"{total_cost:.2f} грн")
         self.fin_sale.config(text=f"{total_sale:.2f} грн")
         profit = total_sale - total_cost
-        self.fin_profit.config(text=f"{profit:.2f} грн", foreground="#16a34a" if profit >= 0 else "#dc2626")
+        self.fin_profit.config(
+            text=f"{profit:.2f} грн", foreground="#16a34a" if profit >= 0 else "#dc2626"
+        )
         margin = (profit / total_sale * 100) if total_sale > 0 else 0
         self.fin_margin.config(text=f"{margin:.1f}%")
 
@@ -2507,7 +3113,7 @@ class DetailCalculatorFrame(tk.Frame):
         self.fin_markup.insert(0, str(calc["markup_percent"] or 30))
 
     def recalc_finances(self):
-        if not hasattr(self, 'current_fin_calc_id') or not self.current_fin_calc_id:
+        if not hasattr(self, "current_fin_calc_id") or not self.current_fin_calc_id:
             messagebox.showwarning("Увага", "Спочатку виберіть КП")
             return
 
@@ -2520,20 +3126,30 @@ class DetailCalculatorFrame(tk.Frame):
         db = get_calc_db()
         c = db.cursor()
 
-        c.execute("UPDATE calc_calculations SET markup_percent=? WHERE id=?", (new_markup, self.current_fin_calc_id))
+        c.execute(
+            "UPDATE calc_calculations SET markup_percent=? WHERE id=?",
+            (new_markup, self.current_fin_calc_id),
+        )
 
-        items = c.execute("SELECT id, total_cost, quantity FROM calc_items WHERE calculation_id=?",
-                         (self.current_fin_calc_id,)).fetchall()
+        items = c.execute(
+            "SELECT id, total_cost, quantity FROM calc_items WHERE calculation_id=?",
+            (self.current_fin_calc_id,),
+        ).fetchall()
 
         total_sale = 0
         for it in items:
             unit_price = it["total_cost"] * (1 + new_markup / 100)
             sale = unit_price * it["quantity"]
-            c.execute("UPDATE calc_items SET unit_price=?, total_price=? WHERE id=?",
-                     (unit_price, sale, it["id"]))
+            c.execute(
+                "UPDATE calc_items SET unit_price=?, total_price=? WHERE id=?",
+                (unit_price, sale, it["id"]),
+            )
             total_sale += sale
 
-        c.execute("UPDATE calc_calculations SET sale_price=? WHERE id=?", (total_sale, self.current_fin_calc_id))
+        c.execute(
+            "UPDATE calc_calculations SET sale_price=? WHERE id=?",
+            (total_sale, self.current_fin_calc_id),
+        )
 
         self.load_finances_data()
         messagebox.showinfo("Готово", "Націнку оновлено та перераховано!")

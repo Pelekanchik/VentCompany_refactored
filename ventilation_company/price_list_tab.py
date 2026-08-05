@@ -1,44 +1,52 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Прайс-лист вентиляційних виробів — ВКЛАДКА
 (адаптовано для інтеграції в VentilationApp)
 """
 
+import csv
 import json
 import os
-import webbrowser
-import tempfile
-import csv
 import platform
-import subprocess
 import shutil
+import subprocess
+import tempfile
 import uuid
-import traceback
+import webbrowser
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import Any
+
+from ventilation_company.models.product import Product
 
 try:
     import tkinter as tk
-    from tkinter import ttk, messagebox, filedialog
+    from tkinter import filedialog, messagebox, ttk
 except ImportError:
     print("❌ tkinter не знайдено.")
-    raise SystemExit(1)
+    raise SystemExit(1) from None
 
 DATA_FILE = "ventilation_price_list.json"
 EXPORT_DIR = "exports"
 BACKUP_DIR = "backups"
 MATERIALS = ["цинк", "нержавійка"]
 CATEGORIES = [
-    "Вентилятор", "Труба прямокутна", "Труба кругла", "Фасонка",
-    "Заслінка", "Решітка", "Клапан", "Комплектуюче", "Інше"
+    "Вентилятор",
+    "Труба прямокутна",
+    "Труба кругла",
+    "Фасонка",
+    "Заслінка",
+    "Решітка",
+    "Клапан",
+    "Комплектуюче",
+    "Інше",
 ]
 
 HAS_OPENPYXL = False
 try:
     from openpyxl import Workbook, load_workbook
-    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
+
     HAS_OPENPYXL = True
 except ImportError:
     pass
@@ -61,22 +69,20 @@ def open_folder_crossplatform(path: str):
 def generate_id() -> str:
     return str(uuid.uuid4())[:8]
 
-from ventilation_company.models.product import Product, PriceHistoryEntry
-
 
 class PriceList:
     def __init__(self, filepath: str = DATA_FILE):
         self.filepath = filepath
-        self.products: List[Product] = []
-        self._undo_stack: List[List[dict]] = []
-        self._redo_stack: List[List[dict]] = []
+        self.products: list[Product] = []
+        self._undo_stack: list[list[dict]] = []
+        self._redo_stack: list[list[dict]] = []
         self._max_undo = 20
         self._load()
 
-    def _snapshot(self) -> List[dict]:
+    def _snapshot(self) -> list[dict]:
         return [p.to_dict() for p in self.products]
 
-    def _restore(self, snapshot: List[dict]):
+    def _restore(self, snapshot: list[dict]):
         self.products = [Product.from_dict(d) for d in snapshot]
 
     def _push_undo(self):
@@ -107,7 +113,7 @@ class PriceList:
         if not os.path.exists(self.filepath):
             return
         try:
-            with open(self.filepath, "r", encoding="utf-8") as f:
+            with open(self.filepath, encoding="utf-8") as f:
                 raw = json.load(f)
             for item in raw:
                 self.products.append(Product.from_dict(item))
@@ -128,7 +134,13 @@ class PriceList:
         backup_path = os.path.join(BACKUP_DIR, f"backup_{timestamp}.json")
         try:
             shutil.copy2(self.filepath, backup_path)
-            backups = sorted([f for f in os.listdir(BACKUP_DIR) if f.startswith("backup_") and f.endswith(".json")])
+            backups = sorted(
+                [
+                    f
+                    for f in os.listdir(BACKUP_DIR)
+                    if f.startswith("backup_") and f.endswith(".json")
+                ]
+            )
             for old in backups[:-10]:
                 os.remove(os.path.join(BACKUP_DIR, old))
         except Exception:
@@ -139,11 +151,11 @@ class PriceList:
         self.products.append(product)
         return product
 
-    def bulk_add(self, products: List[Product]):
+    def bulk_add(self, products: list[Product]):
         self._push_undo()
         self.products.extend(products)
 
-    def get_by_id(self, product_id: str) -> Optional[Product]:
+    def get_by_id(self, product_id: str) -> Product | None:
         for p in self.products:
             if p.id == product_id:
                 return p
@@ -160,7 +172,7 @@ class PriceList:
     def total_sum(self) -> float:
         return round(sum(p.total_price for p in self.products), 2)
 
-    def bulk_edit_price(self, ids: List[str], new_price: float) -> int:
+    def bulk_edit_price(self, ids: list[str], new_price: float) -> int:
         self._push_undo()
         count = 0
         for p in self.products:
@@ -171,7 +183,7 @@ class PriceList:
                 count += 1
         return count
 
-    def bulk_edit_price_percent(self, ids: List[str], percent: float) -> int:
+    def bulk_edit_price_percent(self, ids: list[str], percent: float) -> int:
         self._push_undo()
         count = 0
         for p in self.products:
@@ -182,7 +194,7 @@ class PriceList:
                 count += 1
         return count
 
-    def bulk_edit_quantity(self, ids: List[str], new_qty: float) -> int:
+    def bulk_edit_quantity(self, ids: list[str], new_qty: float) -> int:
         self._push_undo()
         count = 0
         for p in self.products:
@@ -191,7 +203,7 @@ class PriceList:
                 count += 1
         return count
 
-    def bulk_edit_material(self, ids: List[str], new_material: str) -> int:
+    def bulk_edit_material(self, ids: list[str], new_material: str) -> int:
         self._push_undo()
         count = 0
         for p in self.products:
@@ -200,7 +212,7 @@ class PriceList:
                 count += 1
         return count
 
-    def get_statistics(self) -> Dict[str, Any]:
+    def get_statistics(self) -> dict[str, Any]:
         if not self.products:
             return {}
         stats = {
@@ -208,19 +220,28 @@ class PriceList:
             "total_sum": self.total_sum(),
             "by_material": {},
             "by_category": {},
-            "avg_price": round(sum(p.price_per_unit for p in self.products) / len(self.products), 2),
+            "avg_price": round(
+                sum(p.price_per_unit for p in self.products) / len(self.products), 2
+            ),
             "total_quantity": sum(p.quantity for p in self.products),
         }
         for p in self.products:
-            stats["by_material"][p.material] = stats["by_material"].get(p.material, 0) + p.total_price
-            stats["by_category"][p.category] = stats["by_category"].get(p.category, 0) + p.total_price
+            stats["by_material"][p.material] = (
+                stats["by_material"].get(p.material, 0) + p.total_price
+            )
+            stats["by_category"][p.category] = (
+                stats["by_category"].get(p.category, 0) + p.total_price
+            )
         return stats
 
 
-def generate_print_html(products: List[Product], grand_total: float, title: str = "Прайс-лист") -> str:
+def generate_print_html(
+    products: list[Product], grand_total: float, title: str = "Прайс-лист"
+) -> str:
     rows = []
     for p in products:
-        rows.append(f"""
+        rows.append(
+            f"""
         <tr>
             <td style="text-align:center;white-space:nowrap;">{p.date_only}</td>
             <td><b>{p.name}</b></td>
@@ -235,7 +256,8 @@ def generate_print_html(products: List[Product], grand_total: float, title: str 
             <td style="text-align:right;">{p.price_per_unit:,.2f}</td>
             <td style="text-align:right;font-weight:bold;color:#2e7d32;">{p.total_price:,.2f}</td>
         </tr>
-        """)
+        """
+        )
 
     html = f"""<!DOCTYPE html>
 <html lang="uk">
@@ -368,7 +390,7 @@ def generate_print_html(products: List[Product], grand_total: float, title: str 
     return html
 
 
-def export_to_excel(products: List[Product], grand_total: float, filepath: str) -> bool:
+def export_to_excel(products: list[Product], grand_total: float, filepath: str) -> bool:
     if not HAS_OPENPYXL:
         return False
 
@@ -380,16 +402,28 @@ def export_to_excel(products: List[Product], grand_total: float, filepath: str) 
     header_fill = PatternFill(start_color="1565C0", end_color="1565C0", fill_type="solid")
     header_align = Alignment(horizontal="center", vertical="center")
     thin_border = Border(
-        left=Side(style="thin"), right=Side(style="thin"),
-        top=Side(style="thin"), bottom=Side(style="thin")
+        left=Side(style="thin"),
+        right=Side(style="thin"),
+        top=Side(style="thin"),
+        bottom=Side(style="thin"),
     )
     total_font = Font(bold=True, size=12, color="0D47A1")
     total_fill = PatternFill(start_color="E3F2FD", end_color="E3F2FD", fill_type="solid")
 
     headers = [
-        "Дата", "Назва виробу", "Категорія", "Довжина, мм", "Ширина, мм",
-        "Висота, мм", "Діаметр, мм", "Матеріал", "Товщина, мм", "К-ть",
-        "Ціна за шт, грн", "Загальна, грн", "Примітки"
+        "Дата",
+        "Назва виробу",
+        "Категорія",
+        "Довжина, мм",
+        "Ширина, мм",
+        "Висота, мм",
+        "Діаметр, мм",
+        "Матеріал",
+        "Товщина, мм",
+        "К-ть",
+        "Ціна за шт, грн",
+        "Загальна, грн",
+        "Примітки",
     ]
 
     for col, header in enumerate(headers, 1):
@@ -401,16 +435,25 @@ def export_to_excel(products: List[Product], grand_total: float, filepath: str) 
 
     for row_idx, p in enumerate(products, 2):
         data = [
-            p.date_only, p.name, p.category, p.length, p.width,
-            p.height, p.diameter, p.material, p.thickness,
-            p.quantity, p.price_per_unit, p.total_price, p.notes
+            p.date_only,
+            p.name,
+            p.category,
+            p.length,
+            p.width,
+            p.height,
+            p.diameter,
+            p.material,
+            p.thickness,
+            p.quantity,
+            p.price_per_unit,
+            p.total_price,
+            p.notes,
         ]
         for col, val in enumerate(data, 1):
             cell = ws.cell(row=row_idx, column=col, value=val)
             cell.border = thin_border
             cell.alignment = Alignment(
-                horizontal="center" if col not in (2, 13) else "left",
-                vertical="center"
+                horizontal="center" if col not in (2, 13) else "left", vertical="center"
             )
             if col in (11, 12):
                 cell.number_format = "#,##0.00"
@@ -435,7 +478,7 @@ def export_to_excel(products: List[Product], grand_total: float, filepath: str) 
 
 
 class AddProductDialog(tk.Toplevel):
-    def __init__(self, parent, product_to_clone: Optional[Product] = None):
+    def __init__(self, parent, product_to_clone: Product | None = None):
         super().__init__(parent)
         self.title("Новий виріб" if product_to_clone is None else "Дублювати виріб")
         self.geometry("420x600")
@@ -447,28 +490,47 @@ class AddProductDialog(tk.Toplevel):
         now_str = datetime.now().strftime("%d.%m.%Y %H:%M")
         clone = product_to_clone
 
-        tk.Label(self, text=self.title(), font=("Segoe UI", 14, "bold"),
-                 fg="#1565c0").pack(pady=(15, 5))
-        tk.Label(self, text=f"Дата додавання: {now_str}",
-                 font=("Segoe UI", 9), fg="#666").pack(pady=(0, 10))
+        tk.Label(self, text=self.title(), font=("Segoe UI", 14, "bold"), fg="#1565c0").pack(
+            pady=(15, 5)
+        )
+        tk.Label(self, text=f"Дата додавання: {now_str}", font=("Segoe UI", 9), fg="#666").pack(
+            pady=(0, 10)
+        )
 
         text_fields = [
             ("name", "Назва виробу *", False, clone.name if clone else ""),
             ("length", "Довжина (мм)", True, str(clone.length) if clone and clone.length else ""),
             ("width", "Ширина (мм)", True, str(clone.width) if clone and clone.width else ""),
             ("height", "Висота (мм)", True, str(clone.height) if clone and clone.height else ""),
-            ("diameter", "Діаметр (мм)", True, str(clone.diameter) if clone and clone.diameter else ""),
-            ("thickness", "Товщина матеріалу (мм)", True, str(clone.thickness) if clone and clone.thickness else ""),
-            ("price_per_unit", "Ціна за штуку (грн) *", True, str(clone.price_per_unit) if clone else ""),
+            (
+                "diameter",
+                "Діаметр (мм)",
+                True,
+                str(clone.diameter) if clone and clone.diameter else "",
+            ),
+            (
+                "thickness",
+                "Товщина матеріалу (мм)",
+                True,
+                str(clone.thickness) if clone and clone.thickness else "",
+            ),
+            (
+                "price_per_unit",
+                "Ціна за штуку (грн) *",
+                True,
+                str(clone.price_per_unit) if clone else "",
+            ),
             ("quantity", "Кількість *", True, str(clone.quantity) if clone else "1"),
             ("notes", "Примітки", False, clone.notes if clone else ""),
         ]
 
         self.entries = {}
-        for key, label, numeric, default in text_fields:
+        for key, label, _numeric, default in text_fields:
             frm = tk.Frame(self)
             frm.pack(fill="x", padx=20, pady=3)
-            tk.Label(frm, text=label + ":", font=("Segoe UI", 9), width=32, anchor="w").pack(side="left")
+            tk.Label(frm, text=label + ":", font=("Segoe UI", 9), width=32, anchor="w").pack(
+                side="left"
+            )
             ent = tk.Entry(frm, font=("Segoe UI", 10), width=22)
             ent.insert(0, default)
             ent.pack(side="left")
@@ -476,25 +538,51 @@ class AddProductDialog(tk.Toplevel):
 
         frm_cat = tk.Frame(self)
         frm_cat.pack(fill="x", padx=20, pady=3)
-        tk.Label(frm_cat, text="Категорія:", font=("Segoe UI", 9), width=32, anchor="w").pack(side="left")
+        tk.Label(frm_cat, text="Категорія:", font=("Segoe UI", 9), width=32, anchor="w").pack(
+            side="left"
+        )
         self.category_var = tk.StringVar(value=clone.category if clone else CATEGORIES[0])
-        ttk.Combobox(frm_cat, textvariable=self.category_var, values=CATEGORIES,
-                     state="readonly", font=("Segoe UI", 10), width=20).pack(side="left")
+        ttk.Combobox(
+            frm_cat,
+            textvariable=self.category_var,
+            values=CATEGORIES,
+            state="readonly",
+            font=("Segoe UI", 10),
+            width=20,
+        ).pack(side="left")
 
         frm_mat = tk.Frame(self)
         frm_mat.pack(fill="x", padx=20, pady=3)
-        tk.Label(frm_mat, text="Матеріал:", font=("Segoe UI", 9), width=32, anchor="w").pack(side="left")
-        self.material_var = tk.StringVar(value=clone.material if clone and clone.material in MATERIALS else MATERIALS[0])
-        ttk.Combobox(frm_mat, textvariable=self.material_var, values=MATERIALS,
-                     state="readonly", font=("Segoe UI", 10), width=20).pack(side="left")
+        tk.Label(frm_mat, text="Матеріал:", font=("Segoe UI", 9), width=32, anchor="w").pack(
+            side="left"
+        )
+        self.material_var = tk.StringVar(
+            value=clone.material if clone and clone.material in MATERIALS else MATERIALS[0]
+        )
+        ttk.Combobox(
+            frm_mat,
+            textvariable=self.material_var,
+            values=MATERIALS,
+            state="readonly",
+            font=("Segoe UI", 10),
+            width=20,
+        ).pack(side="left")
 
         frm = tk.Frame(self)
         frm.pack(pady=20)
-        tk.Button(frm, text="💾 Зберегти виріб", bg="#1565c0", fg="white",
-                  font=("Segoe UI", 11, "bold"), padx=25, pady=5,
-                  command=self._save).pack(side="left", padx=5)
-        tk.Button(frm, text="Скасувати", font=("Segoe UI", 10),
-                  padx=15, command=self.destroy).pack(side="left", padx=5)
+        tk.Button(
+            frm,
+            text="💾 Зберегти виріб",
+            bg="#1565c0",
+            fg="white",
+            font=("Segoe UI", 11, "bold"),
+            padx=25,
+            pady=5,
+            command=self._save,
+        ).pack(side="left", padx=5)
+        tk.Button(frm, text="Скасувати", font=("Segoe UI", 10), padx=15, command=self.destroy).pack(
+            side="left", padx=5
+        )
 
         self.entries["name"].focus()
         self.wait_window(self)
@@ -544,15 +632,23 @@ class BulkPriceDialog(tk.Toplevel):
         self.grab_set()
         self.result = None
 
-        tk.Label(self, text=f"Вибрано виробів: {count}", font=("Segoe UI", 11, "bold"), fg="#1565c0").pack(pady=10)
+        tk.Label(
+            self, text=f"Вибрано виробів: {count}", font=("Segoe UI", 11, "bold"), fg="#1565c0"
+        ).pack(pady=10)
 
         self.mode_var = tk.StringVar(value="abs")
         frm_mode = tk.Frame(self)
         frm_mode.pack(pady=5)
-        tk.Radiobutton(frm_mode, text="Нова ціна за шт", variable=self.mode_var,
-                       value="abs", command=self._toggle).pack(side="left", padx=10)
-        tk.Radiobutton(frm_mode, text="На відсоток", variable=self.mode_var,
-                       value="pct", command=self._toggle).pack(side="left", padx=10)
+        tk.Radiobutton(
+            frm_mode,
+            text="Нова ціна за шт",
+            variable=self.mode_var,
+            value="abs",
+            command=self._toggle,
+        ).pack(side="left", padx=10)
+        tk.Radiobutton(
+            frm_mode, text="На відсоток", variable=self.mode_var, value="pct", command=self._toggle
+        ).pack(side="left", padx=10)
 
         self.lbl = tk.Label(self, text="Нова ціна за шт (грн):", font=("Segoe UI", 10))
         self.lbl.pack(pady=(10, 0))
@@ -565,8 +661,15 @@ class BulkPriceDialog(tk.Toplevel):
 
         frm = tk.Frame(self)
         frm.pack(pady=15)
-        tk.Button(frm, text="Застосувати", bg="#1565c0", fg="white",
-                  font=("Segoe UI", 10, "bold"), padx=15, command=self._ok).pack(side="left", padx=5)
+        tk.Button(
+            frm,
+            text="Застосувати",
+            bg="#1565c0",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            padx=15,
+            command=self._ok,
+        ).pack(side="left", padx=5)
         tk.Button(frm, text="Скасувати", command=self.destroy).pack(side="left", padx=5)
 
         self._toggle()
@@ -595,7 +698,7 @@ class BulkPriceDialog(tk.Toplevel):
 
 
 class StatisticsDialog(tk.Toplevel):
-    def __init__(self, parent, stats: Dict[str, Any]):
+    def __init__(self, parent, stats: dict[str, Any]):
         super().__init__(parent)
         self.title("📊 Статистика")
         self.geometry("450x500")
@@ -613,7 +716,9 @@ class StatisticsDialog(tk.Toplevel):
         scrollbar = ttk.Scrollbar(self, orient="vertical", command=canvas.yview)
         scroll_frame = tk.Frame(canvas)
 
-        scroll_frame.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        scroll_frame.bind(
+            "<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
         canvas.create_window((0, 0), window=scroll_frame, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
 
@@ -621,8 +726,14 @@ class StatisticsDialog(tk.Toplevel):
         scrollbar.pack(side="right", fill="y")
 
         def add_section(title, data_dict):
-            frm = tk.LabelFrame(scroll_frame, text=title, font=("Segoe UI", 10, "bold"),
-                                fg="#1565c0", padx=10, pady=10)
+            frm = tk.LabelFrame(
+                scroll_frame,
+                text=title,
+                font=("Segoe UI", 10, "bold"),
+                fg="#1565c0",
+                padx=10,
+                pady=10,
+            )
             frm.pack(fill="x", pady=5, padx=5)
             if not data_dict:
                 tk.Label(frm, text="—", font=("Segoe UI", 9), fg="#666").pack()
@@ -631,11 +742,17 @@ class StatisticsDialog(tk.Toplevel):
                 row = tk.Frame(frm)
                 row.pack(fill="x", pady=2)
                 tk.Label(row, text=str(key), font=("Segoe UI", 9), anchor="w").pack(side="left")
-                tk.Label(row, text=f"{val:,.2f} грн", font=("Segoe UI", 9, "bold"),
-                         fg="#2e7d32", anchor="e").pack(side="right")
+                tk.Label(
+                    row,
+                    text=f"{val:,.2f} грн",
+                    font=("Segoe UI", 9, "bold"),
+                    fg="#2e7d32",
+                    anchor="e",
+                ).pack(side="right")
 
-        tk.Label(scroll_frame, text="📊 Загальна статистика", font=("Segoe UI", 14, "bold"),
-                 fg="#1565c0").pack(pady=(10, 5))
+        tk.Label(
+            scroll_frame, text="📊 Загальна статистика", font=("Segoe UI", 14, "bold"), fg="#1565c0"
+        ).pack(pady=(10, 5))
 
         info = tk.Frame(scroll_frame)
         info.pack(fill="x", padx=10, pady=5)
@@ -648,7 +765,9 @@ class StatisticsDialog(tk.Toplevel):
             row = tk.Frame(info)
             row.pack(fill="x", pady=2)
             tk.Label(row, text=label, font=("Segoe UI", 10), anchor="w").pack(side="left")
-            tk.Label(row, text=str(val), font=("Segoe UI", 10, "bold"), anchor="e").pack(side="right")
+            tk.Label(row, text=str(val), font=("Segoe UI", 10, "bold"), anchor="e").pack(
+                side="right"
+            )
 
         add_section("💰 Сума за матеріалами", stats.get("by_material", {}))
         add_section("📁 Сума за категоріями", stats.get("by_category", {}))
@@ -666,8 +785,12 @@ class HistoryDialog(tk.Toplevel):
         self.transient(parent)
         self.grab_set()
 
-        tk.Label(self, text=f"Історія зміни ціни: {product.name}",
-                 font=("Segoe UI", 11, "bold"), fg="#1565c0").pack(pady=10)
+        tk.Label(
+            self,
+            text=f"Історія зміни ціни: {product.name}",
+            font=("Segoe UI", 11, "bold"),
+            fg="#1565c0",
+        ).pack(pady=10)
 
         cols = ("date", "old", "new", "diff")
         tree = ttk.Treeview(self, columns=cols, show="headings", height=10)
@@ -683,12 +806,11 @@ class HistoryDialog(tk.Toplevel):
 
         for h in reversed(product.price_history):
             diff = h.new_price - h.old_price
-            tree.insert("", "end", values=(
-                h.date,
-                f"{h.old_price:,.2f}",
-                f"{h.new_price:,.2f}",
-                f"{diff:+.2f}"
-            ))
+            tree.insert(
+                "",
+                "end",
+                values=(h.date, f"{h.old_price:,.2f}", f"{h.new_price:,.2f}", f"{diff:+.2f}"),
+            )
 
         tree.pack(fill="both", expand=True, padx=10, pady=5)
         tk.Button(self, text="Закрити", command=self.destroy, width=15).pack(pady=10)
@@ -705,30 +827,56 @@ class ImportDialog(tk.Toplevel):
         self.grab_set()
         self.result = None
 
-        tk.Label(self, text="Імпорт з CSV або Excel", font=("Segoe UI", 12, "bold"),
-                 fg="#1565c0").pack(pady=15)
+        tk.Label(
+            self, text="Імпорт з CSV або Excel", font=("Segoe UI", 12, "bold"), fg="#1565c0"
+        ).pack(pady=15)
 
-        tk.Label(self, text="Формат файлів:\n"
-                 "CSV: Дата;Назва;Категорія;Довжина;Ширина;Висота;Діаметр;Матеріал;Товщина;К-ть;Ціна;Примітки\n"
-                 "Excel: аналогічно, з заголовком у першому рядку",
-                 font=("Segoe UI", 9), fg="#555", justify="center").pack(pady=5)
+        tk.Label(
+            self,
+            text="Формат файлів:\n"
+            "CSV: Дата;Назва;Категорія;Довжина;Ширина;Висота;Діаметр;Матеріал;Товщина;К-ть;Ціна;Примітки\n"
+            "Excel: аналогічно, з заголовком у першому рядку",
+            font=("Segoe UI", 9),
+            fg="#555",
+            justify="center",
+        ).pack(pady=5)
 
         self.skip_duplicates = tk.BooleanVar(value=True)
-        tk.Checkbutton(self, text="Пропускати дублікати за назвою", variable=self.skip_duplicates,
-                       font=("Segoe UI", 9)).pack(pady=5)
+        tk.Checkbutton(
+            self,
+            text="Пропускати дублікати за назвою",
+            variable=self.skip_duplicates,
+            font=("Segoe UI", 9),
+        ).pack(pady=5)
 
         frm = tk.Frame(self)
         frm.pack(pady=20)
-        tk.Button(frm, text="📄 Імпортувати CSV", command=self._import_csv,
-                  bg="#1565c0", fg="white", font=("Segoe UI", 10, "bold"), padx=15).pack(side="left", padx=5)
+        tk.Button(
+            frm,
+            text="📄 Імпортувати CSV",
+            command=self._import_csv,
+            bg="#1565c0",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            padx=15,
+        ).pack(side="left", padx=5)
         if HAS_OPENPYXL:
-            tk.Button(frm, text="📊 Імпортувати Excel", command=self._import_excel,
-                      bg="#2e7d32", fg="white", font=("Segoe UI", 10, "bold"), padx=15).pack(side="left", padx=5)
-        tk.Button(frm, text="Скасувати", command=self.destroy, font=("Segoe UI", 10)).pack(side="left", padx=5)
+            tk.Button(
+                frm,
+                text="📊 Імпортувати Excel",
+                command=self._import_excel,
+                bg="#2e7d32",
+                fg="white",
+                font=("Segoe UI", 10, "bold"),
+                padx=15,
+            ).pack(side="left", padx=5)
+        tk.Button(frm, text="Скасувати", command=self.destroy, font=("Segoe UI", 10)).pack(
+            side="left", padx=5
+        )
 
         self.wait_window(self)
 
-    def _parse_row(self, row: list) -> Optional[Product]:
+    def _parse_row(self, row: list) -> Product | None:
         try:
             if len(row) < 2:
                 return None
@@ -758,25 +906,35 @@ class ImportDialog(tk.Toplevel):
             notes = get_val(11)
 
             return Product(
-                product_id=generate_id(), date_added=date_added, name=name,
-                price_per_unit=price, quantity=quantity, length=length, width=width,
-                height=height, diameter=diameter, material=material, thickness=thickness,
-                category=category, notes=notes
+                product_id=generate_id(),
+                date_added=date_added,
+                name=name,
+                price_per_unit=price,
+                quantity=quantity,
+                length=length,
+                width=width,
+                height=height,
+                diameter=diameter,
+                material=material,
+                thickness=thickness,
+                category=category,
+                notes=notes,
             )
         except Exception:
             return None
 
     def _import_csv(self):
         path = filedialog.askopenfilename(
-            parent=self, title="Виберіть CSV-файл",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+            parent=self,
+            title="Виберіть CSV-файл",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")],
         )
         if not path:
             return
         products = []
         existing_names = set()
         try:
-            with open(path, "r", encoding="utf-8-sig") as f:
+            with open(path, encoding="utf-8-sig") as f:
                 reader = csv.reader(f, delimiter=";")
                 next(reader, None)
                 for row in reader:
@@ -796,8 +954,9 @@ class ImportDialog(tk.Toplevel):
         if not HAS_OPENPYXL:
             return
         path = filedialog.askopenfilename(
-            parent=self, title="Виберіть Excel-файл",
-            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")]
+            parent=self,
+            title="Виберіть Excel-файл",
+            filetypes=[("Excel files", "*.xlsx"), ("All files", "*.*")],
         )
         if not path:
             return
@@ -821,7 +980,7 @@ class ImportDialog(tk.Toplevel):
 
 
 class PriceListTab:
-    def __init__(self, parent_frame: tk.Frame, root: tk.Tk, colors: Optional[dict] = None):
+    def __init__(self, parent_frame: tk.Frame, root: tk.Tk, colors: dict | None = None):
         self.frame = parent_frame
         self.root = root
         self.colors = colors
@@ -871,32 +1030,73 @@ class PriceListTab:
         toolbar.pack(fill="x")
         toolbar.pack_propagate(False)
 
-        btn_cfg = dict(font=("Segoe UI", 10, "bold"), bg="#1565c0", fg="white",
-                       activebackground="#0d47a1", activeforeground="white",
-                       bd=0, padx=12, pady=6, cursor="hand2")
+        btn_cfg = {
+            "font": ("Segoe UI", 10, "bold"),
+            "bg": "#1565c0",
+            "fg": "white",
+            "activebackground": "#0d47a1",
+            "activeforeground": "white",
+            "bd": 0,
+            "padx": 12,
+            "pady": 6,
+            "cursor": "hand2",
+        }
 
-        tk.Button(toolbar, text="➕ Додати", command=self._add, **btn_cfg).pack(side="left", padx=5, pady=8)
-        tk.Button(toolbar, text="🗑️ Видалити", command=self._delete, **btn_cfg).pack(side="left", padx=5, pady=8)
-        tk.Button(toolbar, text="📋 Дублювати", command=self._duplicate, **btn_cfg).pack(side="left", padx=5, pady=8)
-        tk.Button(toolbar, text="💰 Масова ціна", command=self._bulk_price, **btn_cfg).pack(side="left", padx=5, pady=8)
-        tk.Button(toolbar, text="🖨️ Друк", command=self._print, **btn_cfg).pack(side="left", padx=5, pady=8)
-        tk.Button(toolbar, text="📥 Імпорт", command=self._import, **btn_cfg).pack(side="left", padx=5, pady=8)
-        tk.Button(toolbar, text="📊 Excel", command=self._export_excel, **btn_cfg).pack(side="left", padx=5, pady=8)
-        tk.Button(toolbar, text="📜 Історія", command=self._show_history, **btn_cfg).pack(side="left", padx=5, pady=8)
-        tk.Button(toolbar, text="📊 Статистика", command=self._show_statistics, **btn_cfg).pack(side="left", padx=5, pady=8)
-        tk.Button(toolbar, text="↩️ Undo", command=self._undo, **btn_cfg).pack(side="left", padx=5, pady=8)
-        tk.Button(toolbar, text="↪️ Redo", command=self._redo, **btn_cfg).pack(side="left", padx=5, pady=8)
-        tk.Button(toolbar, text="💾 Зберегти", command=self._save, **btn_cfg).pack(side="left", padx=5, pady=8)
+        tk.Button(toolbar, text="➕ Додати", command=self._add, **btn_cfg).pack(
+            side="left", padx=5, pady=8
+        )
+        tk.Button(toolbar, text="🗑️ Видалити", command=self._delete, **btn_cfg).pack(
+            side="left", padx=5, pady=8
+        )
+        tk.Button(toolbar, text="📋 Дублювати", command=self._duplicate, **btn_cfg).pack(
+            side="left", padx=5, pady=8
+        )
+        tk.Button(toolbar, text="💰 Масова ціна", command=self._bulk_price, **btn_cfg).pack(
+            side="left", padx=5, pady=8
+        )
+        tk.Button(toolbar, text="🖨️ Друк", command=self._print, **btn_cfg).pack(
+            side="left", padx=5, pady=8
+        )
+        tk.Button(toolbar, text="📥 Імпорт", command=self._import, **btn_cfg).pack(
+            side="left", padx=5, pady=8
+        )
+        tk.Button(toolbar, text="📊 Excel", command=self._export_excel, **btn_cfg).pack(
+            side="left", padx=5, pady=8
+        )
+        tk.Button(toolbar, text="📜 Історія", command=self._show_history, **btn_cfg).pack(
+            side="left", padx=5, pady=8
+        )
+        tk.Button(toolbar, text="📊 Статистика", command=self._show_statistics, **btn_cfg).pack(
+            side="left", padx=5, pady=8
+        )
+        tk.Button(toolbar, text="↩️ Undo", command=self._undo, **btn_cfg).pack(
+            side="left", padx=5, pady=8
+        )
+        tk.Button(toolbar, text="↪️ Redo", command=self._redo, **btn_cfg).pack(
+            side="left", padx=5, pady=8
+        )
+        tk.Button(toolbar, text="💾 Зберегти", command=self._save, **btn_cfg).pack(
+            side="left", padx=5, pady=8
+        )
 
         search_frame = tk.Frame(self.frame, bg="#f5f5f5", height=40)
         search_frame.pack(fill="x", padx=10, pady=(10, 0))
         search_frame.pack_propagate(False)
-        tk.Label(search_frame, text="🔍 Пошук:", bg="#f5f5f5", font=("Segoe UI", 10)).pack(side="left", padx=5)
+        tk.Label(search_frame, text="🔍 Пошук:", bg="#f5f5f5", font=("Segoe UI", 10)).pack(
+            side="left", padx=5
+        )
         self.search_var = tk.StringVar()
         self.search_var.trace("w", lambda *args: self._refresh_table())
-        tk.Entry(search_frame, textvariable=self.search_var, font=("Segoe UI", 10), width=40).pack(side="left", padx=5)
-        tk.Label(search_frame, text="(назва, матеріал, категорія, примітки, дата)",
-                 bg="#f5f5f5", fg="#888", font=("Segoe UI", 9)).pack(side="left", padx=5)
+        tk.Entry(search_frame, textvariable=self.search_var, font=("Segoe UI", 10), width=40).pack(
+            side="left", padx=5
+        )
+        tk.Label(
+            search_frame,
+            text="(назва, матеріал, категорія, примітки, дата)",
+            bg="#f5f5f5",
+            fg="#888",
+            font=("Segoe UI", 9),
+        ).pack(side="left", padx=5)
 
         table_frame = tk.Frame(self.frame)
         table_frame.pack(fill="both", expand=True, padx=10, pady=10)
@@ -904,12 +1104,14 @@ class PriceListTab:
         cols = [c[0] for c in self.col_map]
         self.tree = ttk.Treeview(table_frame, columns=cols, show="headings", selectmode="extended")
 
-        for col, (attr, typ, editable, is_combo, width) in enumerate(self.col_map):
+        for col, (_attr, _typ, _editable, _is_combo, width) in enumerate(self.col_map):
             col_name = cols[col]
-            self.tree.heading(col_name, text=self._headings.get(col_name, col_name),
-                              command=lambda c=col: self._sort_by(c))
-            self.tree.column(col_name, width=width,
-                             anchor="center" if col_name != "name" else "w")
+            self.tree.heading(
+                col_name,
+                text=self._headings.get(col_name, col_name),
+                command=lambda c=col: self._sort_by(c),
+            )
+            self.tree.column(col_name, width=width, anchor="center" if col_name != "name" else "w")
 
         vsb = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
         hsb = ttk.Scrollbar(table_frame, orient="horizontal", command=self.tree.xview)
@@ -936,12 +1138,25 @@ class PriceListTab:
         self.sum_frame = tk.Frame(self.frame, bg="#e3f2fd", height=40)
         self.sum_frame.pack(fill="x", side="bottom")
         self.sum_frame.pack_propagate(False)
-        self.sum_label = tk.Label(self.sum_frame, text="", font=("Segoe UI", 12, "bold"),
-                                   bg="#e3f2fd", fg="#0d47a1", anchor="e")
+        self.sum_label = tk.Label(
+            self.sum_frame,
+            text="",
+            font=("Segoe UI", 12, "bold"),
+            bg="#e3f2fd",
+            fg="#0d47a1",
+            anchor="e",
+        )
         self.sum_label.pack(fill="x", padx=15, pady=6)
 
-        self.status = tk.Label(self.frame, text="Готово", bd=1, relief="sunken", anchor="w",
-                               font=("Segoe UI", 9), bg="#e3f2fd")
+        self.status = tk.Label(
+            self.frame,
+            text="Готово",
+            bd=1,
+            relief="sunken",
+            anchor="w",
+            font=("Segoe UI", 9),
+            bg="#e3f2fd",
+        )
         self.status.pack(fill="x", side="bottom")
 
         self._edit_widget = None
@@ -960,59 +1175,94 @@ class PriceListTab:
     def _init_demo_data(self):
         if not self.pl.products:
             now = datetime.now().strftime("%d.%m.%Y %H:%M")
-            self.pl.add(Product(
-                product_id=generate_id(), date_added=now,
-                name="Вентилятор осьовий ВО-300",
-                price_per_unit=1250, quantity=2,
-                length=0, width=0, height=0, diameter=0,
-                material="цинк", thickness=0, category="Вентилятор"
-            ))
-            self.pl.add(Product(
-                product_id=generate_id(), date_added=now,
-                name="Труба прямокутна ТП-100",
-                price_per_unit=450, quantity=5,
-                length=1000, width=100, height=50, diameter=0,
-                material="цинк", thickness=0.5, category="Труба прямокутна"
-            ))
-            self.pl.add(Product(
-                product_id=generate_id(), date_added=now,
-                name="Труба кругла ТК-125",
-                price_per_unit=320, quantity=10,
-                length=500, width=125, height=125, diameter=125,
-                material="нержавійка", thickness=0.4, category="Труба кругла"
-            ))
+            self.pl.add(
+                Product(
+                    product_id=generate_id(),
+                    date_added=now,
+                    name="Вентилятор осьовий ВО-300",
+                    price_per_unit=1250,
+                    quantity=2,
+                    length=0,
+                    width=0,
+                    height=0,
+                    diameter=0,
+                    material="цинк",
+                    thickness=0,
+                    category="Вентилятор",
+                )
+            )
+            self.pl.add(
+                Product(
+                    product_id=generate_id(),
+                    date_added=now,
+                    name="Труба прямокутна ТП-100",
+                    price_per_unit=450,
+                    quantity=5,
+                    length=1000,
+                    width=100,
+                    height=50,
+                    diameter=0,
+                    material="цинк",
+                    thickness=0.5,
+                    category="Труба прямокутна",
+                )
+            )
+            self.pl.add(
+                Product(
+                    product_id=generate_id(),
+                    date_added=now,
+                    name="Труба кругла ТК-125",
+                    price_per_unit=320,
+                    quantity=10,
+                    length=500,
+                    width=125,
+                    height=125,
+                    diameter=125,
+                    material="нержавійка",
+                    thickness=0.4,
+                    category="Труба кругла",
+                )
+            )
             self.pl.save()
 
-    def _filtered_products(self) -> List[Product]:
+    def _filtered_products(self) -> list[Product]:
         q = self.search_var.get().lower()
         if not q:
             return self.pl.products
-        return [p for p in self.pl.products
-                if q in p.name.lower()
-                or q in p.material.lower()
-                or q in p.category.lower()
-                or q in p.notes.lower()
-                or q in p.date_added.lower()]
+        return [
+            p
+            for p in self.pl.products
+            if q in p.name.lower()
+            or q in p.material.lower()
+            or q in p.category.lower()
+            or q in p.notes.lower()
+            or q in p.date_added.lower()
+        ]
 
     def _refresh_table(self):
         for item in self.tree.get_children():
             self.tree.delete(item)
 
         for p in self._filtered_products():
-            self.tree.insert("", "end", iid=p.id, values=(
-                p.date_added,
-                p.name,
-                p.category,
-                f"{p.length:g}" if p.length else "",
-                f"{p.width:g}" if p.width else "",
-                f"{p.height:g}" if p.height else "",
-                f"{p.diameter:g}" if p.diameter else "",
-                p.material,
-                f"{p.thickness:g}" if p.thickness else "",
-                f"{p.quantity:g}",
-                f"{p.price_per_unit:,.2f}",
-                f"{p.total_price:,.2f}"
-            ))
+            self.tree.insert(
+                "",
+                "end",
+                iid=p.id,
+                values=(
+                    p.date_added,
+                    p.name,
+                    p.category,
+                    f"{p.length:g}" if p.length else "",
+                    f"{p.width:g}" if p.width else "",
+                    f"{p.height:g}" if p.height else "",
+                    f"{p.diameter:g}" if p.diameter else "",
+                    p.material,
+                    f"{p.thickness:g}" if p.thickness else "",
+                    f"{p.quantity:g}",
+                    f"{p.price_per_unit:,.2f}",
+                    f"{p.total_price:,.2f}",
+                ),
+            )
 
         total = len(self.pl.products)
         visible = len(self._filtered_products())
@@ -1020,10 +1270,10 @@ class PriceListTab:
         self.sum_label.config(text=f"💰 ЗАГАЛЬНА СУМА ПО ВСІХ ПОЗИЦІЯХ: {grand:,.2f} грн")
         self.status.config(
             text=f" Всього: {total} | Відображено: {visible} | "
-                 f"Подвійний клік — редагувати | Ctrl+N — новий | Ctrl+Z — скасувати"
+            f"Подвійний клік — редагувати | Ctrl+N — новий | Ctrl+Z — скасувати"
         )
 
-    def _selected_ids(self) -> List[str]:
+    def _selected_ids(self) -> list[str]:
         return list(self.tree.selection())
 
     def _sort_by(self, col_idx: int):
@@ -1036,7 +1286,7 @@ class PriceListTab:
 
         def sort_key(p: Product):
             val = getattr(p, attr_name, "")
-            if isinstance(val, (int, float)):
+            if isinstance(val, int | float):
                 return (0, val)
             return (1, str(val).lower())
 
@@ -1044,7 +1294,7 @@ class PriceListTab:
         self._refresh_table()
 
         arrow = " ▼" if self._sort_reverse else " ▲"
-        for col, (attr, _, _, _, _) in enumerate(self.col_map):
+        for _col, (attr, _, _, _, _) in enumerate(self.col_map):
             text = self._headings.get(attr, attr)
             if attr == self._sort_column:
                 text += arrow
@@ -1077,8 +1327,9 @@ class PriceListTab:
 
         if is_combobox:
             values = MATERIALS if attr_name == "material" else CATEGORIES
-            self._edit_widget = ttk.Combobox(self.tree, values=values, state="readonly",
-                                              font=("Segoe UI", 10))
+            self._edit_widget = ttk.Combobox(
+                self.tree, values=values, state="readonly", font=("Segoe UI", 10)
+            )
             self._edit_widget.set(current if current in values else values[0])
             self._edit_widget.place(x=x, y=y, width=w, height=h)
             self._edit_widget.focus()
@@ -1086,8 +1337,9 @@ class PriceListTab:
             self._edit_widget.bind("<Return>", self._save_inline)
             self._edit_widget.bind("<Escape>", self._cancel_inline)
         else:
-            self._edit_widget = tk.Entry(self.tree, font=("Segoe UI", 10),
-                                         justify="center" if attr_type != "str" else "left")
+            self._edit_widget = tk.Entry(
+                self.tree, font=("Segoe UI", 10), justify="center" if attr_type != "str" else "left"
+            )
             self._edit_widget.place(x=x, y=y, width=w, height=h)
             self._edit_widget.insert(0, current)
             self._edit_widget.select_range(0, tk.END)
@@ -1116,10 +1368,7 @@ class PriceListTab:
         if not self._edit_widget:
             return
 
-        if self._edit_is_combo:
-            raw = self._edit_widget.get()
-        else:
-            raw = self._edit_widget.get().strip()
+        raw = self._edit_widget.get() if self._edit_is_combo else self._edit_widget.get().strip()
 
         self._edit_widget.destroy()
         self._edit_widget = None
@@ -1259,7 +1508,7 @@ class PriceListTab:
             messagebox.showerror(
                 "Бібліотека не встановлена",
                 "Для експорту в Excel потрібна бібліотека openpyxl.\n\n"
-                "Встановіть її командою:\n  pip install openpyxl"
+                "Встановіть її командою:\n  pip install openpyxl",
             )
             return
         if not os.path.exists(EXPORT_DIR):

@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Модуль інтеграції HTML-редактора креслень через pywebview
 """
 
-import json
 import os
-import sys
 import sqlite3
 import subprocess
+import sys
 from pathlib import Path
 
 # ========== ЛОГУВАННЯ ==========
 LOG_FILE = Path(__file__).parent / "webview_debug.log"
+
+
 def log(msg):
     try:
         with open(LOG_FILE, "a", encoding="utf-8") as f:
             f.write(f"[{__import__('datetime').datetime.now().isoformat()}] {msg}\n")
     except Exception:
         pass
+
 
 log("=== СТАРТ drawing_editor.py ===")
 log(f"sys.argv = {sys.argv}")
@@ -35,6 +36,7 @@ log(f"sys.path[0] = {sys.path[0]}")
 # Імпортуємо після додавання шляху
 try:
     from ventilation_company.config import DB_PATH
+
     log(f"DB_PATH = {DB_PATH}")
 except Exception as e:
     log(f"ПОМИЛКА імпорту config: {e}")
@@ -44,6 +46,7 @@ except Exception as e:
 
 try:
     import webview
+
     HAS_WEBVIEW = True
     log("pywebview імпортовано успішно")
 except ImportError as e:
@@ -70,10 +73,7 @@ class DrawingApi:
 
     def get_project_info(self):
         log("get_project_info викликано")
-        return {
-            "project_id": self.project_id,
-            "project_name": self.project_name
-        }
+        return {"project_id": self.project_id, "project_name": self.project_name}
 
     def load_drawing(self, project_id: int):
         log(f"load_drawing викликано для pid={project_id}")
@@ -82,7 +82,7 @@ class DrawingApi:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT drawing_data FROM project_drawings WHERE project_id = ? ORDER BY updated_at DESC LIMIT 1",
-                (project_id,)
+                (project_id,),
             )
             row = cursor.fetchone()
             conn.close()
@@ -98,23 +98,20 @@ class DrawingApi:
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
-            cursor.execute(
-                "SELECT id FROM project_drawings WHERE project_id = ?",
-                (project_id,)
-            )
+            cursor.execute("SELECT id FROM project_drawings WHERE project_id = ?", (project_id,))
             row = cursor.fetchone()
             if row:
                 cursor.execute(
-                    """UPDATE project_drawings 
-                       SET drawing_data = ?, updated_at = CURRENT_TIMESTAMP 
+                    """UPDATE project_drawings
+                       SET drawing_data = ?, updated_at = CURRENT_TIMESTAMP
                        WHERE project_id = ?""",
-                    (drawing_data, project_id)
+                    (drawing_data, project_id),
                 )
             else:
                 cursor.execute(
-                    """INSERT INTO project_drawings (project_id, drawing_data) 
+                    """INSERT INTO project_drawings (project_id, drawing_data)
                        VALUES (?, ?)""",
-                    (project_id, drawing_data)
+                    (project_id, drawing_data),
                 )
             conn.commit()
             conn.close()
@@ -137,6 +134,7 @@ class DrawingApi:
             filepath = save_dir / filename
             if mime_type.startswith("image/"):
                 import base64
+
                 if "," in data:
                     data = data.split(",", 1)[1]
                 raw = base64.b64decode(data)
@@ -155,7 +153,9 @@ class DrawingApi:
         return str(save_dir)
 
 
-def open_drawing_editor(db_path: str, project_id: int, project_name: str, width: int = 1400, height: int = 900):
+def open_drawing_editor(
+    db_path: str, project_id: int, project_name: str, width: int = 1400, height: int = 900
+):
     log(f"open_drawing_editor: db={db_path}, name={project_name}")
 
     if not HAS_WEBVIEW:
@@ -181,8 +181,7 @@ def open_drawing_editor(db_path: str, project_id: int, project_name: str, width:
         height=height,
         min_size=(1000, 700),
         confirm_close=True,
-        
-        js_api=api
+        js_api=api,
     )
 
     api.set_window(window)
@@ -190,17 +189,20 @@ def open_drawing_editor(db_path: str, project_id: int, project_name: str, width:
     # Автоматично відкрити DevTools (F12) після завантаження сторінки
     def on_loaded():
         try:
-            window.evaluate_js("""
+            window.evaluate_js(
+                """
                 setTimeout(function(){
                     var e = new KeyboardEvent('keydown', {
                         bubbles: true, cancelable: true, key: 'F12', keyCode: 123, which: 123
                     });
                     document.dispatchEvent(e);
                 }, 800);
-            """)
+            """
+            )
             log("DevTools відкрито автоматично")
         except Exception as e:
             log("Не вдалося відкрити DevTools: " + str(e))
+
     window.events.loaded += on_loaded
 
     log("Запускаємо webview.start()...")
@@ -223,13 +225,13 @@ def launch_editor(db_path: str, project_id: int, project_name: str):
         [sys.executable, str(editor_path), db_path, str(project_id), project_name],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        creationflags=subprocess.DETACHED_PROCESS  # не чекаємо завершення, не показуємо консоль
+        creationflags=subprocess.DETACHED_PROCESS,  # не чекаємо завершення, не показуємо консоль
     )
     log("subprocess.Popen виконано")
 
 
 # ========== ЗАПУСК ЧЕРЕЗ КОМАНДНИЙ РЯДОК ==========
-if __name__ == '__main__':
+if __name__ == "__main__":
     log("=== __main__ блок ===")
     if len(sys.argv) >= 4:
         db_path = sys.argv[1]
@@ -241,6 +243,9 @@ if __name__ == '__main__':
         except Exception as e:
             log(f"КРИТИЧНА ПОМИЛКА: {e}")
             import traceback
+
             log(traceback.format_exc())
     else:
-        log("Недостатньо аргументів. Очікується: python drawing_editor.py <db_path> <project_id> <project_name>")
+        log(
+            "Недостатньо аргументів. Очікується: python drawing_editor.py <db_path> <project_id> <project_name>"
+        )

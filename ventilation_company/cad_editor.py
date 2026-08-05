@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 CAD Редактор 2.0 — Об'єднана версія
 """
-import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
-import math
 import json
-from datetime import datetime
-
+import math
+import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
 
 # ===================== geometry =====================
 
@@ -20,13 +17,11 @@ def point_in_polygon(x, y, poly):
     p1x, p1y = poly[0]
     for i in range(1, n + 1):
         p2x, p2y = poly[i % n]
-        if y > min(p1y, p2y):
-            if y <= max(p1y, p2y):
-                if x <= max(p1x, p2x):
-                    if p1y != p2y:
-                        xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
-                    if p1x == p2x or x <= xinters:
-                        inside = not inside
+        if y > min(p1y, p2y) and y <= max(p1y, p2y) and x <= max(p1x, p2x):
+            if p1y != p2y:
+                xinters = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+            if p1x == p2x or x <= xinters:
+                inside = not inside
         p1x, p1y = p2x, p2y
     return inside
 
@@ -56,8 +51,7 @@ def offset_line(x1, y1, x2, y2, distance):
         return None
     ux, uy = dx / length, dy / length
     nx, ny = uy, -ux
-    return (x1 + nx * distance, y1 + ny * distance,
-            x2 + nx * distance, y2 + ny * distance)
+    return (x1 + nx * distance, y1 + ny * distance, x2 + nx * distance, y2 + ny * distance)
 
 
 def distance_point_to_line(px, py, x1, y1, x2, y2):
@@ -66,7 +60,7 @@ def distance_point_to_line(px, py, x1, y1, x2, y2):
     dy = y2 - y1
     if dx == 0 and dy == 0:
         return math.hypot(px - x1, py - y1)
-    t = max(0, min(1, ((px - x1) * dx + (py - y1) * dy) / (dx*dx + dy*dy)))
+    t = max(0, min(1, ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy)))
     proj_x = x1 + t * dx
     proj_y = y1 + t * dy
     return math.hypot(px - proj_x, py - proj_y)
@@ -79,15 +73,17 @@ def rotate_point(x, y, cx, cy, angle_deg):
     sin_a = math.sin(rad)
     dx = x - cx
     dy = y - cy
-    return (cx + dx * cos_a - dy * sin_a,
-            cy + dx * sin_a + dy * cos_a)
+    return (cx + dx * cos_a - dy * sin_a, cy + dx * sin_a + dy * cos_a)
+
 
 # ===================== entities =====================
 
 
 class CADPoint:
     """Точка на кресленні"""
+
     __slots__ = ("x", "y", "snap")
+
     def __init__(self, x, y, snap=True):
         self.x = float(x)
         self.y = float(y)
@@ -108,7 +104,9 @@ class CADPoint:
 
 class CADEntity:
     """Базовий клас графічного примітива"""
+
     _id_counter = 0
+
     def __init__(self, layer="0", color="#2c3e50", line_width=1):
         CADEntity._id_counter += 1
         self.id = CADEntity._id_counter
@@ -161,8 +159,12 @@ class CADLine(CADEntity):
         self.p2 = p2
 
     def bbox(self):
-        return (min(self.p1.x, self.p2.x), min(self.p1.y, self.p2.y),
-                max(self.p1.x, self.p2.x), max(self.p1.y, self.p2.y))
+        return (
+            min(self.p1.x, self.p2.x),
+            min(self.p1.y, self.p2.y),
+            max(self.p1.x, self.p2.x),
+            max(self.p1.y, self.p2.y),
+        )
 
     def length(self):
         return math.hypot(self.p2.x - self.p1.x, self.p2.y - self.p1.y)
@@ -171,8 +173,7 @@ class CADLine(CADEntity):
         return ((self.p1.x + self.p2.x) / 2, (self.p1.y + self.p2.y) / 2)
 
     def hit_test(self, x, y, tol=5):
-        return distance_point_to_line(x, y, self.p1.x, self.p1.y,
-                                      self.p2.x, self.p2.y) <= tol
+        return distance_point_to_line(x, y, self.p1.x, self.p1.y, self.p2.x, self.p2.y) <= tol
 
     def get_snap_points(self):
         mx, my = self.midpoint()
@@ -183,12 +184,19 @@ class CADLine(CADEntity):
         ]
 
     def copy_entity(self):
-        return CADLine(self.p1.copy(), self.p2.copy(),
-                       layer=self.layer, color=self.color, line_width=self.line_width)
+        return CADLine(
+            self.p1.copy(),
+            self.p2.copy(),
+            layer=self.layer,
+            color=self.color,
+            line_width=self.line_width,
+        )
 
     def move(self, dx, dy):
-        self.p1.x += dx; self.p1.y += dy
-        self.p2.x += dx; self.p2.y += dy
+        self.p1.x += dx
+        self.p1.y += dy
+        self.p2.x += dx
+        self.p2.y += dy
         self.invalidate_bbox()
 
     def rotate(self, cx, cy, angle_deg):
@@ -207,6 +215,7 @@ class CADLine(CADEntity):
             proj_x = x1 + t * dx_line
             proj_y = y1 + t * dy_line
             return (2 * proj_x - px, 2 * proj_y - py)
+
         self.p1.x, self.p1.y = _mirror(self.p1.x, self.p1.y)
         self.p2.x, self.p2.y = _mirror(self.p2.x, self.p2.y)
         self.invalidate_bbox()
@@ -222,8 +231,12 @@ class CADRectangle(CADEntity):
         self.p2 = p2
 
     def bbox(self):
-        return (min(self.p1.x, self.p2.x), min(self.p1.y, self.p2.y),
-                max(self.p1.x, self.p2.x), max(self.p1.y, self.p2.y))
+        return (
+            min(self.p1.x, self.p2.x),
+            min(self.p1.y, self.p2.y),
+            max(self.p1.x, self.p2.x),
+            max(self.p1.y, self.p2.y),
+        )
 
     def width(self):
         return abs(self.p2.x - self.p1.x)
@@ -233,25 +246,37 @@ class CADRectangle(CADEntity):
 
     def hit_test(self, x, y, tol=5):
         bx1, by1, bx2, by2 = self.bbox()
-        return (bx1 - tol <= x <= bx2 + tol and by1 - tol <= y <= by2 + tol and
-                (x <= bx1 + tol or x >= bx2 - tol or y <= by1 + tol or y >= by2 - tol))
+        return (
+            bx1 - tol <= x <= bx2 + tol
+            and by1 - tol <= y <= by2 + tol
+            and (x <= bx1 + tol or x >= bx2 - tol or y <= by1 + tol or y >= by2 - tol)
+        )
 
     def get_snap_points(self):
         x1, y1 = self.p1.x, self.p1.y
         x2, y2 = self.p2.x, self.p2.y
         return [
-            (x1, y1, "endpoint"), (x2, y1, "endpoint"),
-            (x1, y2, "endpoint"), (x2, y2, "endpoint"),
-            ((x1+x2)/2, (y1+y2)/2, "midpoint"),
+            (x1, y1, "endpoint"),
+            (x2, y1, "endpoint"),
+            (x1, y2, "endpoint"),
+            (x2, y2, "endpoint"),
+            ((x1 + x2) / 2, (y1 + y2) / 2, "midpoint"),
         ]
 
     def copy_entity(self):
-        return CADRectangle(self.p1.copy(), self.p2.copy(),
-                            layer=self.layer, color=self.color, line_width=self.line_width)
+        return CADRectangle(
+            self.p1.copy(),
+            self.p2.copy(),
+            layer=self.layer,
+            color=self.color,
+            line_width=self.line_width,
+        )
 
     def move(self, dx, dy):
-        self.p1.x += dx; self.p1.y += dy
-        self.p2.x += dx; self.p2.y += dy
+        self.p1.x += dx
+        self.p1.y += dy
+        self.p2.x += dx
+        self.p2.y += dy
         self.invalidate_bbox()
 
     def rotate(self, cx, cy, angle_deg):
@@ -270,6 +295,7 @@ class CADRectangle(CADEntity):
             proj_x = x1 + t * dx_line
             proj_y = y1 + t * dy_line
             return (2 * proj_x - px, 2 * proj_y - py)
+
         self.p1.x, self.p1.y = _mirror(self.p1.x, self.p1.y)
         self.p2.x, self.p2.y = _mirror(self.p2.x, self.p2.y)
         self.invalidate_bbox()
@@ -288,8 +314,12 @@ class CADCircle(CADEntity):
         self.radius = float(radius)
 
     def bbox(self):
-        return (self.center.x - self.radius, self.center.y - self.radius,
-                self.center.x + self.radius, self.center.y + self.radius)
+        return (
+            self.center.x - self.radius,
+            self.center.y - self.radius,
+            self.center.x + self.radius,
+            self.center.y + self.radius,
+        )
 
     def hit_test(self, x, y, tol=5):
         d = math.hypot(x - self.center.x, y - self.center.y)
@@ -300,16 +330,24 @@ class CADCircle(CADEntity):
         r = self.radius
         return [
             (cx, cy, "center"),
-            (cx + r, cy, "quadrant"), (cx - r, cy, "quadrant"),
-            (cx, cy + r, "quadrant"), (cx, cy - r, "quadrant"),
+            (cx + r, cy, "quadrant"),
+            (cx - r, cy, "quadrant"),
+            (cx, cy + r, "quadrant"),
+            (cx, cy - r, "quadrant"),
         ]
 
     def copy_entity(self):
-        return CADCircle(self.center.copy(), self.radius,
-                         layer=self.layer, color=self.color, line_width=self.line_width)
+        return CADCircle(
+            self.center.copy(),
+            self.radius,
+            layer=self.layer,
+            color=self.color,
+            line_width=self.line_width,
+        )
 
     def move(self, dx, dy):
-        self.center.x += dx; self.center.y += dy
+        self.center.x += dx
+        self.center.y += dy
         self.invalidate_bbox()
 
     def rotate(self, cx, cy, angle_deg):
@@ -327,11 +365,12 @@ class CADCircle(CADEntity):
             proj_x = x1 + t * dx_line
             proj_y = y1 + t * dy_line
             return (2 * proj_x - px, 2 * proj_y - py)
+
         self.center.x, self.center.y = _mirror(self.center.x, self.center.y)
         self.invalidate_bbox()
 
     def area(self):
-        return math.pi * self.radius ** 2
+        return math.pi * self.radius**2
 
     def perimeter(self):
         return 2 * math.pi * self.radius
@@ -347,12 +386,20 @@ class CADArc(CADEntity):
 
     def bbox(self):
         pts = []
-        for ang in [self.start_angle, self.end_angle,
-                    (self.start_angle + self.end_angle) / 2,
-                    self.start_angle + 90, self.end_angle - 90]:
+        for ang in [
+            self.start_angle,
+            self.end_angle,
+            (self.start_angle + self.end_angle) / 2,
+            self.start_angle + 90,
+            self.end_angle - 90,
+        ]:
             rad = math.radians(ang)
-            pts.append((self.center.x + self.radius * math.cos(rad),
-                       self.center.y + self.radius * math.sin(rad)))
+            pts.append(
+                (
+                    self.center.x + self.radius * math.cos(rad),
+                    self.center.y + self.radius * math.sin(rad),
+                )
+            )
         xs = [p[0] for p in pts]
         ys = [p[1] for p in pts]
         return (min(xs), min(ys), max(xs), max(ys))
@@ -379,12 +426,19 @@ class CADArc(CADEntity):
         return pts
 
     def copy_entity(self):
-        return CADArc(self.center.copy(), self.radius,
-                      self.start_angle, self.end_angle,
-                      layer=self.layer, color=self.color, line_width=self.line_width)
+        return CADArc(
+            self.center.copy(),
+            self.radius,
+            self.start_angle,
+            self.end_angle,
+            layer=self.layer,
+            color=self.color,
+            line_width=self.line_width,
+        )
 
     def move(self, dx, dy):
-        self.center.x += dx; self.center.y += dy
+        self.center.x += dx
+        self.center.y += dy
         self.invalidate_bbox()
 
     def rotate(self, cx, cy, angle_deg):
@@ -404,11 +458,14 @@ class CADArc(CADEntity):
             proj_x = x1 + t * dx_line
             proj_y = y1 + t * dy_line
             return (2 * proj_x - px, 2 * proj_y - py)
+
         self.center.x, self.center.y = _mirror(self.center.x, self.center.y)
         line_angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
+
         def mirror_angle(a):
             diff = a - line_angle
             return (line_angle - diff) % 360
+
         self.start_angle = mirror_angle(self.start_angle)
         self.end_angle = mirror_angle(self.end_angle)
         if self.start_angle > self.end_angle:
@@ -437,8 +494,12 @@ class CADDimension(CADEntity):
         return math.hypot(self.p2.x - self.p1.x, self.p2.y - self.p1.y)
 
     def bbox(self):
-        return (min(self.p1.x, self.p2.x), min(self.p1.y, self.p2.y),
-                max(self.p1.x, self.p2.x), max(self.p1.y, self.p2.y))
+        return (
+            min(self.p1.x, self.p2.x),
+            min(self.p1.y, self.p2.y),
+            max(self.p1.x, self.p2.x),
+            max(self.p1.y, self.p2.y),
+        )
 
     def hit_test(self, x, y, tol=8):
         bx1, by1, bx2, by2 = self.bbox()
@@ -451,12 +512,21 @@ class CADDimension(CADEntity):
         ]
 
     def copy_entity(self):
-        return CADDimension(self.p1.copy(), self.p2.copy(), self.offset, self.text,
-                            layer=self.layer, color=self.color, line_width=self.line_width)
+        return CADDimension(
+            self.p1.copy(),
+            self.p2.copy(),
+            self.offset,
+            self.text,
+            layer=self.layer,
+            color=self.color,
+            line_width=self.line_width,
+        )
 
     def move(self, dx, dy):
-        self.p1.x += dx; self.p1.y += dy
-        self.p2.x += dx; self.p2.y += dy
+        self.p1.x += dx
+        self.p1.y += dy
+        self.p2.x += dx
+        self.p2.y += dy
         self.invalidate_bbox()
 
     def rotate(self, cx, cy, angle_deg):
@@ -475,6 +545,7 @@ class CADDimension(CADEntity):
             proj_x = x1 + t * dx_line
             proj_y = y1 + t * dy_line
             return (2 * proj_x - px, 2 * proj_y - py)
+
         self.p1.x, self.p1.y = _mirror(self.p1.x, self.p1.y)
         self.p2.x, self.p2.y = _mirror(self.p2.x, self.p2.y)
         self.invalidate_bbox()
@@ -482,6 +553,7 @@ class CADDimension(CADEntity):
 
 class CADPolyline(CADEntity):
     """Полілінія — послідовність точок. Критично для профілів вентиляції."""
+
     def __init__(self, points, closed=False, **kwargs):
         super().__init__(**kwargs)
         self.points = list(points)
@@ -498,13 +570,14 @@ class CADPolyline(CADEntity):
         pts = self.points
         n = len(pts)
         for i in range(n - 1):
-            if distance_point_to_line(x, y, pts[i].x, pts[i].y,
-                                      pts[i+1].x, pts[i+1].y) <= tol:
+            if distance_point_to_line(x, y, pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y) <= tol:
                 return True
-        if self.closed and n > 2:
-            if distance_point_to_line(x, y, pts[-1].x, pts[-1].y,
-                                      pts[0].x, pts[0].y) <= tol:
-                return True
+        if (
+            self.closed
+            and n > 2
+            and distance_point_to_line(x, y, pts[-1].x, pts[-1].y, pts[0].x, pts[0].y) <= tol
+        ):
+            return True
         if self.closed and n > 2:
             poly = [(p.x, p.y) for p in self.points]
             if point_in_polygon(x, y, poly):
@@ -516,8 +589,8 @@ class CADPolyline(CADEntity):
         for p in self.points:
             pts.append((p.x, p.y, "endpoint"))
         for i in range(len(self.points) - 1):
-            mx = (self.points[i].x + self.points[i+1].x) / 2
-            my = (self.points[i].y + self.points[i+1].y) / 2
+            mx = (self.points[i].x + self.points[i + 1].x) / 2
+            my = (self.points[i].y + self.points[i + 1].y) / 2
             pts.append((mx, my, "midpoint"))
         if self.closed and len(self.points) > 2:
             mx = (self.points[-1].x + self.points[0].x) / 2
@@ -526,12 +599,18 @@ class CADPolyline(CADEntity):
         return pts
 
     def copy_entity(self):
-        return CADPolyline([p.copy() for p in self.points], self.closed,
-                           layer=self.layer, color=self.color, line_width=self.line_width)
+        return CADPolyline(
+            [p.copy() for p in self.points],
+            self.closed,
+            layer=self.layer,
+            color=self.color,
+            line_width=self.line_width,
+        )
 
     def move(self, dx, dy):
         for p in self.points:
-            p.x += dx; p.y += dy
+            p.x += dx
+            p.y += dy
         self.invalidate_bbox()
 
     def rotate(self, cx, cy, angle_deg):
@@ -550,6 +629,7 @@ class CADPolyline(CADEntity):
             proj_x = x1 + t * dx_line
             proj_y = y1 + t * dy_line
             return (2 * proj_x - px, 2 * proj_y - py)
+
         for p in self.points:
             p.x, p.y = _mirror(p.x, p.y)
         self.invalidate_bbox()
@@ -557,11 +637,13 @@ class CADPolyline(CADEntity):
     def perimeter(self):
         per = 0
         for i in range(len(self.points) - 1):
-            per += math.hypot(self.points[i+1].x - self.points[i].x,
-                              self.points[i+1].y - self.points[i].y)
+            per += math.hypot(
+                self.points[i + 1].x - self.points[i].x, self.points[i + 1].y - self.points[i].y
+            )
         if self.closed and len(self.points) > 2:
-            per += math.hypot(self.points[0].x - self.points[-1].x,
-                              self.points[0].y - self.points[-1].y)
+            per += math.hypot(
+                self.points[0].x - self.points[-1].x, self.points[0].y - self.points[-1].y
+            )
         return per
 
     def area(self):
@@ -591,12 +673,14 @@ class CADPolyline(CADEntity):
             ux, uy = dx / length, dy / length
             nx, ny = uy, -ux
             new_pts.append(CADPoint(p0.x + nx * distance, p0.y + ny * distance))
-        return CADPolyline(new_pts, self.closed,
-                           layer=self.layer, color=self.color, line_width=self.line_width)
+        return CADPolyline(
+            new_pts, self.closed, layer=self.layer, color=self.color, line_width=self.line_width
+        )
 
 
 class CADText(CADEntity):
     """Текстова мітка — маркування деталей вентиляції"""
+
     def __init__(self, x, y, text, height=10, angle=0, align="left", **kwargs):
         super().__init__(**kwargs)
         self.x = x
@@ -609,14 +693,16 @@ class CADText(CADEntity):
     def bbox(self):
         approx_width = len(self.text) * self.height * 0.6
         if self.align == "center":
-            return (self.x - approx_width/2, self.y - self.height,
-                    self.x + approx_width/2, self.y + self.height/4)
+            return (
+                self.x - approx_width / 2,
+                self.y - self.height,
+                self.x + approx_width / 2,
+                self.y + self.height / 4,
+            )
         elif self.align == "right":
-            return (self.x - approx_width, self.y - self.height,
-                    self.x, self.y + self.height/4)
+            return (self.x - approx_width, self.y - self.height, self.x, self.y + self.height / 4)
         else:
-            return (self.x, self.y - self.height,
-                    self.x + approx_width, self.y + self.height/4)
+            return (self.x, self.y - self.height, self.x + approx_width, self.y + self.height / 4)
 
     def hit_test(self, x, y, tol=8):
         bx1, by1, bx2, by2 = self.bbox()
@@ -626,11 +712,21 @@ class CADText(CADEntity):
         return [(self.x, self.y, "insert")]
 
     def copy_entity(self):
-        return CADText(self.x, self.y, self.text, self.height, self.angle, self.align,
-                       layer=self.layer, color=self.color, line_width=self.line_width)
+        return CADText(
+            self.x,
+            self.y,
+            self.text,
+            self.height,
+            self.angle,
+            self.align,
+            layer=self.layer,
+            color=self.color,
+            line_width=self.line_width,
+        )
 
     def move(self, dx, dy):
-        self.x += dx; self.y += dy
+        self.x += dx
+        self.y += dy
         self.invalidate_bbox()
 
     def rotate(self, cx, cy, angle_deg):
@@ -649,6 +745,7 @@ class CADText(CADEntity):
             proj_x = x1 + t * dx_line
             proj_y = y1 + t * dy_line
             return (2 * proj_x - px, 2 * proj_y - py)
+
         self.x, self.y = _mirror(self.x, self.y)
         line_angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
         diff = self.angle - line_angle
@@ -658,6 +755,7 @@ class CADText(CADEntity):
 
 class CADHatch(CADEntity):
     """Лінійне штрихування (наприклад, для позначення ізоляції)"""
+
     def __init__(self, boundary_points, angle=45, spacing=5, **kwargs):
         super().__init__(layer="HATCH", color="#95a5a6", line_width=1, **kwargs)
         self.boundary = list(boundary_points)
@@ -682,16 +780,22 @@ class CADHatch(CADEntity):
             return []
         xs = [p.x for p in self.boundary]
         ys = [p.y for p in self.boundary]
-        return [((min(xs) + max(xs))/2, (min(ys) + max(ys))/2, "midpoint")]
+        return [((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2, "midpoint")]
 
     def copy_entity(self):
-        return CADHatch([p.copy() for p in self.boundary],
-                        self.hatch_angle, self.spacing,
-                        layer=self.layer, color=self.color, line_width=self.line_width)
+        return CADHatch(
+            [p.copy() for p in self.boundary],
+            self.hatch_angle,
+            self.spacing,
+            layer=self.layer,
+            color=self.color,
+            line_width=self.line_width,
+        )
 
     def move(self, dx, dy):
         for p in self.boundary:
-            p.x += dx; p.y += dy
+            p.x += dx
+            p.y += dy
         self.invalidate_bbox()
 
     def rotate(self, cx, cy, angle_deg):
@@ -711,6 +815,7 @@ class CADHatch(CADEntity):
             proj_x = x1 + t * dx_line
             proj_y = y1 + t * dy_line
             return (2 * proj_x - px, 2 * proj_y - py)
+
         for p in self.boundary:
             p.x, p.y = _mirror(p.x, p.y)
         line_angle = math.degrees(math.atan2(y2 - y1, x2 - x1))
@@ -721,6 +826,7 @@ class CADHatch(CADEntity):
 
 class CADHole(CADEntity):
     """Отвір — вентиляційний отвір (коло з хрестиком центрування)"""
+
     def __init__(self, center, radius, label="", **kwargs):
         super().__init__(layer="HOLES", color="#e67e22", line_width=1, **kwargs)
         self.center = center
@@ -728,8 +834,12 @@ class CADHole(CADEntity):
         self.label = label
 
     def bbox(self):
-        return (self.center.x - self.radius, self.center.y - self.radius,
-                self.center.x + self.radius, self.center.y + self.radius)
+        return (
+            self.center.x - self.radius,
+            self.center.y - self.radius,
+            self.center.x + self.radius,
+            self.center.y + self.radius,
+        )
 
     def hit_test(self, x, y, tol=5):
         d = math.hypot(x - self.center.x, y - self.center.y)
@@ -740,16 +850,25 @@ class CADHole(CADEntity):
         r = self.radius
         return [
             (cx, cy, "center"),
-            (cx + r, cy, "quadrant"), (cx - r, cy, "quadrant"),
-            (cx, cy + r, "quadrant"), (cx, cy - r, "quadrant"),
+            (cx + r, cy, "quadrant"),
+            (cx - r, cy, "quadrant"),
+            (cx, cy + r, "quadrant"),
+            (cx, cy - r, "quadrant"),
         ]
 
     def copy_entity(self):
-        return CADHole(self.center.copy(), self.radius, self.label,
-                       layer=self.layer, color=self.color, line_width=self.line_width)
+        return CADHole(
+            self.center.copy(),
+            self.radius,
+            self.label,
+            layer=self.layer,
+            color=self.color,
+            line_width=self.line_width,
+        )
 
     def move(self, dx, dy):
-        self.center.x += dx; self.center.y += dy
+        self.center.x += dx
+        self.center.y += dy
         self.invalidate_bbox()
 
     def rotate(self, cx, cy, angle_deg):
@@ -767,22 +886,27 @@ class CADHole(CADEntity):
             proj_x = x1 + t * dx_line
             proj_y = y1 + t * dy_line
             return (2 * proj_x - px, 2 * proj_y - py)
+
         self.center.x, self.center.y = _mirror(self.center.x, self.center.y)
         self.invalidate_bbox()
 
     def area(self):
-        return math.pi * self.radius ** 2
+        return math.pi * self.radius**2
 
     def perimeter(self):
         return 2 * math.pi * self.radius
 
+
 # ===================== commands =====================
 class Command:
     """Базовий клас команди"""
+
     def execute(self, editor):
         raise NotImplementedError
+
     def undo(self, editor):
         raise NotImplementedError
+
     def __str__(self):
         return self.__class__.__name__
 
@@ -790,11 +914,14 @@ class Command:
 class AddEntityCmd(Command):
     def __init__(self, entity):
         self.entity = entity
+
     def execute(self, editor):
         editor.entities.append(self.entity)
+
     def undo(self, editor):
         if self.entity in editor.entities:
             editor.entities.remove(self.entity)
+
     def __str__(self):
         return f"Додати {type(self.entity).__name__}"
 
@@ -803,15 +930,18 @@ class DeleteEntityCmd(Command):
     def __init__(self, entities):
         self.entities = list(entities)
         self.indices = []
+
     def execute(self, editor):
         self.indices = []
         for e in self.entities:
             if e in editor.entities:
                 self.indices.append(editor.entities.index(e))
                 editor.entities.remove(e)
+
     def undo(self, editor):
-        for idx, e in sorted(zip(self.indices, self.entities), key=lambda x: x[0]):
+        for idx, e in sorted(zip(self.indices, self.entities, strict=False), key=lambda x: x[0]):
             editor.entities.insert(idx, e)
+
     def __str__(self):
         return f"Видалити {len(self.entities)} об'єктів"
 
@@ -821,12 +951,15 @@ class MoveEntityCmd(Command):
         self.entities = list(entities)
         self.dx = dx
         self.dy = dy
+
     def execute(self, editor):
         for e in self.entities:
             e.move(self.dx, self.dy)
+
     def undo(self, editor):
         for e in self.entities:
             e.move(-self.dx, -self.dy)
+
     def __str__(self):
         return f"Зрушити на ({self.dx:.1f}, {self.dy:.1f})"
 
@@ -837,12 +970,15 @@ class RotateEntityCmd(Command):
         self.cx = cx
         self.cy = cy
         self.angle = angle
+
     def execute(self, editor):
         for e in self.entities:
             e.rotate(self.cx, self.cy, self.angle)
+
     def undo(self, editor):
         for e in self.entities:
             e.rotate(self.cx, self.cy, -self.angle)
+
     def __str__(self):
         return f"Обертання на {self.angle:.1f}°"
 
@@ -851,12 +987,15 @@ class MirrorEntityCmd(Command):
     def __init__(self, entities, x1, y1, x2, y2):
         self.entities = list(entities)
         self.x1, self.y1, self.x2, self.y2 = x1, y1, x2, y2
+
     def execute(self, editor):
         for e in self.entities:
             e.mirror(self.x1, self.y1, self.x2, self.y2)
+
     def undo(self, editor):
         for e in self.entities:
             e.mirror(self.x1, self.y1, self.x2, self.y2)
+
     def __str__(self):
         return "Дзеркальне відображення"
 
@@ -864,29 +1003,33 @@ class MirrorEntityCmd(Command):
 class ClearCmd(Command):
     def __init__(self):
         self.saved_entities = []
+
     def execute(self, editor):
         self.saved_entities = list(editor.entities)
         editor.entities.clear()
+
     def undo(self, editor):
         editor.entities = list(self.saved_entities)
+
     def __str__(self):
         return "Очистити креслення"
+
 
 # ===================== core =====================
 
 
-
 class CADEditor:
     """Ядро CAD-редактора з Undo/Redo"""
+
     def __init__(self):
         self.entities = []
         self.layers = {
-            "0":       {"visible": True, "color": "#2c3e50", "name": "Основний"},
-            "CENTER":  {"visible": True, "color": "#3498db", "name": "Осі"},
-            "DIM":     {"visible": True, "color": "#c0392b", "name": "Виміри"},
-            "HATCH":   {"visible": True, "color": "#95a5a6", "name": "Штрихування"},
-            "HOLES":   {"visible": True, "color": "#e67e22", "name": "Отвори"},
-            "TEXT":    {"visible": True, "color": "#8e44ad", "name": "Текст"},
+            "0": {"visible": True, "color": "#2c3e50", "name": "Основний"},
+            "CENTER": {"visible": True, "color": "#3498db", "name": "Осі"},
+            "DIM": {"visible": True, "color": "#c0392b", "name": "Виміри"},
+            "HATCH": {"visible": True, "color": "#95a5a6", "name": "Штрихування"},
+            "HOLES": {"visible": True, "color": "#e67e22", "name": "Отвори"},
+            "TEXT": {"visible": True, "color": "#8e44ad", "name": "Текст"},
         }
         self.grid_size = 10
         self.snap_size = 10
@@ -952,7 +1095,7 @@ class CADEditor:
     def snap_point(self, x, y, snap_modes, entities, canvas_w, canvas_h):
         best = (x, y)
         best_type = "free"
-        best_dist = float('inf')
+        best_dist = float("inf")
         tol = 15 / self.scale
 
         if snap_modes.get("grid", False):
@@ -1054,14 +1197,14 @@ class CADEditor:
     def get_total_area(self):
         total = 0
         for e in self.entities:
-            if hasattr(e, 'area'):
+            if hasattr(e, "area"):
                 total += e.area()
         return total
 
     def get_total_perimeter(self):
         total = 0
         for e in self.entities:
-            if hasattr(e, 'perimeter'):
+            if hasattr(e, "perimeter"):
                 total += e.perimeter()
         return total
 
@@ -1074,29 +1217,39 @@ class CADEditor:
             if isinstance(e, CADLine):
                 sx1, sy1 = self.world_to_screen(e.p1.x, e.p1.y, width, height)
                 sx2, sy2 = self.world_to_screen(e.p2.x, e.p2.y, width, height)
-                lines.append(f'  <line x1="{sx1:.1f}" y1="{sy1:.1f}" x2="{sx2:.1f}" y2="{sy2:.1f}" '
-                           f'stroke="{e.color}" stroke-width="{e.line_width}"/>')
+                lines.append(
+                    f'  <line x1="{sx1:.1f}" y1="{sy1:.1f}" x2="{sx2:.1f}" y2="{sy2:.1f}" '
+                    f'stroke="{e.color}" stroke-width="{e.line_width}"/>'
+                )
             elif isinstance(e, CADRectangle):
                 sx1, sy1 = self.world_to_screen(e.p1.x, e.p1.y, width, height)
                 sx2, sy2 = self.world_to_screen(e.p2.x, e.p2.y, width, height)
                 rx, ry = min(sx1, sx2), min(sy1, sy2)
                 rw, rh = abs(sx2 - sx1), abs(sy2 - sy1)
-                lines.append(f'  <rect x="{rx:.1f}" y="{ry:.1f}" width="{rw:.1f}" height="{rh:.1f}" '
-                           f'fill="none" stroke="{e.color}" stroke-width="{e.line_width}"/>')
+                lines.append(
+                    f'  <rect x="{rx:.1f}" y="{ry:.1f}" width="{rw:.1f}" height="{rh:.1f}" '
+                    f'fill="none" stroke="{e.color}" stroke-width="{e.line_width}"/>'
+                )
             elif isinstance(e, CADCircle):
                 sx, sy = self.world_to_screen(e.center.x, e.center.y, width, height)
                 sr = e.radius * self.scale
-                lines.append(f'  <circle cx="{sx:.1f}" cy="{sy:.1f}" r="{sr:.1f}" '
-                           f'fill="none" stroke="{e.color}" stroke-width="{e.line_width}"/>')
+                lines.append(
+                    f'  <circle cx="{sx:.1f}" cy="{sy:.1f}" r="{sr:.1f}" '
+                    f'fill="none" stroke="{e.color}" stroke-width="{e.line_width}"/>'
+                )
             elif isinstance(e, CADDimension):
                 sx1, sy1 = self.world_to_screen(e.p1.x, e.p1.y, width, height)
                 sx2, sy2 = self.world_to_screen(e.p2.x, e.p2.y, width, height)
                 val = e.value()
                 mx, my = (sx1 + sx2) / 2, (sy1 + sy2) / 2 - 5
-                lines.append(f'  <line x1="{sx1:.1f}" y1="{sy1:.1f}" x2="{sx2:.1f}" y2="{sy2:.1f}" '
-                           f'stroke="{e.color}" stroke-width="1" stroke-dasharray="4,2"/>')
-                lines.append(f'  <text x="{mx:.1f}" y="{my:.1f}" font-size="12" fill="{e.color}" '
-                           f'text-anchor="middle">{val:.1f} мм</text>')
+                lines.append(
+                    f'  <line x1="{sx1:.1f}" y1="{sy1:.1f}" x2="{sx2:.1f}" y2="{sy2:.1f}" '
+                    f'stroke="{e.color}" stroke-width="1" stroke-dasharray="4,2"/>'
+                )
+                lines.append(
+                    f'  <text x="{mx:.1f}" y="{my:.1f}" font-size="12" fill="{e.color}" '
+                    f'text-anchor="middle">{val:.1f} мм</text>'
+                )
             elif isinstance(e, CADArc):
                 sx, sy = self.world_to_screen(e.center.x, e.center.y, width, height)
                 sr = e.radius * self.scale
@@ -1110,10 +1263,12 @@ class CADEditor:
                 y1 = sy - sr * math.sin(math.radians(sa))
                 x2 = sx + sr * math.cos(math.radians(ea))
                 y2 = sy - sr * math.sin(math.radians(ea))
-                lines.append(f'  <path d="M {x1:.1f} {y1:.1f} '
-                           f'A {sr:.1f} {sr:.1f} 0 {large_arc} {sweep} '
-                           f'{x2:.1f} {y2:.1f}" '
-                           f'fill="none" stroke="{e.color}" stroke-width="{e.line_width}"/>')
+                lines.append(
+                    f'  <path d="M {x1:.1f} {y1:.1f} '
+                    f"A {sr:.1f} {sr:.1f} 0 {large_arc} {sweep} "
+                    f'{x2:.1f} {y2:.1f}" '
+                    f'fill="none" stroke="{e.color}" stroke-width="{e.line_width}"/>'
+                )
             elif isinstance(e, CADPolyline):
                 pts = []
                 for p in e.points:
@@ -1122,14 +1277,18 @@ class CADEditor:
                 if e.closed and len(pts) > 0:
                     pts.append(pts[0])
                 path_d = "M " + " L ".join(pts)
-                lines.append(f'  <path d="{path_d}" fill="none" stroke="{e.color}" '
-                           f'stroke-width="{e.line_width}"/>')
+                lines.append(
+                    f'  <path d="{path_d}" fill="none" stroke="{e.color}" '
+                    f'stroke-width="{e.line_width}"/>'
+                )
             elif isinstance(e, CADText):
                 sx, sy = self.world_to_screen(e.x, e.y, width, height)
                 anchor = {"left": "start", "center": "middle", "right": "end"}.get(e.align, "start")
-                lines.append(f'  <text x="{sx:.1f}" y="{sy:.1f}" font-size="{e.height * self.scale:.1f}" '
-                           f'fill="{e.color}" text-anchor="{anchor}" '
-                           f'transform="rotate({-e.angle} {sx:.1f} {sy:.1f})">{e.text}</text>')
+                lines.append(
+                    f'  <text x="{sx:.1f}" y="{sy:.1f}" font-size="{e.height * self.scale:.1f}" '
+                    f'fill="{e.color}" text-anchor="{anchor}" '
+                    f'transform="rotate({-e.angle} {sx:.1f} {sy:.1f})">{e.text}</text>'
+                )
             elif isinstance(e, CADHatch):
                 pts = []
                 for p in e.boundary:
@@ -1137,44 +1296,104 @@ class CADEditor:
                     pts.append(f"{sx:.1f},{sy:.1f}")
                 if len(pts) > 0:
                     pts.append(pts[0])
-                lines.append(f'  <polygon points="{" ".join(pts)}" fill="none" '
-                           f'stroke="{e.color}" stroke-width="0.5" stroke-dasharray="2,2"/>')
+                lines.append(
+                    f'  <polygon points="{" ".join(pts)}" fill="none" '
+                    f'stroke="{e.color}" stroke-width="0.5" stroke-dasharray="2,2"/>'
+                )
             elif isinstance(e, CADHole):
                 sx, sy = self.world_to_screen(e.center.x, e.center.y, width, height)
                 sr = e.radius * self.scale
-                lines.append(f'  <circle cx="{sx:.1f}" cy="{sy:.1f}" r="{sr:.1f}" '
-                           f'fill="none" stroke="{e.color}" stroke-width="{e.line_width}"/>')
-                lines.append(f'  <line x1="{sx-sr:.1f}" y1="{sy:.1f}" x2="{sx+sr:.1f}" y2="{sy:.1f}" '
-                           f'stroke="{e.color}" stroke-width="0.5"/>')
-                lines.append(f'  <line x1="{sx:.1f}" y1="{sy-sr:.1f}" x2="{sx:.1f}" y2="{sy+sr:.1f}" '
-                           f'stroke="{e.color}" stroke-width="0.5"/>')
+                lines.append(
+                    f'  <circle cx="{sx:.1f}" cy="{sy:.1f}" r="{sr:.1f}" '
+                    f'fill="none" stroke="{e.color}" stroke-width="{e.line_width}"/>'
+                )
+                lines.append(
+                    f'  <line x1="{sx-sr:.1f}" y1="{sy:.1f}" x2="{sx+sr:.1f}" y2="{sy:.1f}" '
+                    f'stroke="{e.color}" stroke-width="0.5"/>'
+                )
+                lines.append(
+                    f'  <line x1="{sx:.1f}" y1="{sy-sr:.1f}" x2="{sx:.1f}" y2="{sy+sr:.1f}" '
+                    f'stroke="{e.color}" stroke-width="0.5"/>'
+                )
                 if e.label:
-                    lines.append(f'  <text x="{sx:.1f}" y="{sy-sr-5:.1f}" font-size="10" '
-                               f'fill="{e.color}" text-anchor="middle">{e.label}</text>')
-        lines.append('</svg>')
-        with open(filepath, 'w', encoding='utf-8') as f:
+                    lines.append(
+                        f'  <text x="{sx:.1f}" y="{sy-sr-5:.1f}" font-size="10" '
+                        f'fill="{e.color}" text-anchor="middle">{e.label}</text>'
+                    )
+        lines.append("</svg>")
+        with open(filepath, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
         return filepath
 
     def export_dxf(self, filepath):
-        lines = ["0", "SECTION", "2", "HEADER", "9", "$ACADVER", "1", "AC1009",
-                 "0", "ENDSEC", "0", "SECTION", "2", "TABLES", "0", "ENDSEC",
-                 "0", "SECTION", "2", "BLOCKS", "0", "ENDSEC", "0", "SECTION", "2", "ENTITIES"]
+        lines = [
+            "0",
+            "SECTION",
+            "2",
+            "HEADER",
+            "9",
+            "$ACADVER",
+            "1",
+            "AC1009",
+            "0",
+            "ENDSEC",
+            "0",
+            "SECTION",
+            "2",
+            "TABLES",
+            "0",
+            "ENDSEC",
+            "0",
+            "SECTION",
+            "2",
+            "BLOCKS",
+            "0",
+            "ENDSEC",
+            "0",
+            "SECTION",
+            "2",
+            "ENTITIES",
+        ]
         for e in self.get_visible_entities():
             lines.extend(["0", type(e).__name__.upper().replace("CAD", "")])
             lines.extend(["8", e.layer])
             lines.extend(["62", str(self._color_to_aci(e.color))])
             if isinstance(e, CADLine):
-                lines.extend(["10", str(e.p1.x), "20", str(e.p1.y),
-                              "11", str(e.p2.x), "21", str(e.p2.y)])
+                lines.extend(
+                    ["10", str(e.p1.x), "20", str(e.p1.y), "11", str(e.p2.x), "21", str(e.p2.y)]
+                )
             elif isinstance(e, CADCircle):
                 lines.extend(["10", str(e.center.x), "20", str(e.center.y), "40", str(e.radius)])
             elif isinstance(e, CADArc):
-                lines.extend(["10", str(e.center.x), "20", str(e.center.y),
-                              "40", str(e.radius), "50", str(e.start_angle), "51", str(e.end_angle)])
+                lines.extend(
+                    [
+                        "10",
+                        str(e.center.x),
+                        "20",
+                        str(e.center.y),
+                        "40",
+                        str(e.radius),
+                        "50",
+                        str(e.start_angle),
+                        "51",
+                        str(e.end_angle),
+                    ]
+                )
             elif isinstance(e, CADText):
-                lines.extend(["10", str(e.x), "20", str(e.y), "40", str(e.height),
-                              "1", e.text, "50", str(e.angle)])
+                lines.extend(
+                    [
+                        "10",
+                        str(e.x),
+                        "20",
+                        str(e.y),
+                        "40",
+                        str(e.height),
+                        "1",
+                        e.text,
+                        "50",
+                        str(e.angle),
+                    ]
+                )
             elif isinstance(e, CADPolyline):
                 lines.extend(["70", "1" if e.closed else "0"])
                 for p in e.points:
@@ -1183,30 +1402,38 @@ class CADEditor:
             elif isinstance(e, CADRectangle):
                 x1, y1 = e.p1.x, e.p1.y
                 x2, y2 = e.p2.x, e.p2.y
-                pts = [(x1,y1), (x2,y1), (x2,y2), (x1,y2), (x1,y1)]
+                pts = [(x1, y1), (x2, y1), (x2, y2), (x1, y2), (x1, y1)]
                 lines.extend(["70", "1"])
                 for px, py in pts:
                     lines.extend(["0", "VERTEX", "10", str(px), "20", str(py)])
                 lines.extend(["0", "SEQEND"])
         lines.extend(["0", "ENDSEC", "0", "EOF"])
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
         return filepath
 
     def _color_to_aci(self, hex_color):
-        cmap = {"#2c3e50": 5, "#3498db": 5, "#c0392b": 1, "#95a5a6": 8,
-                "#e67e22": 30, "#8e44ad": 201, "#27ae60": 3}
+        cmap = {
+            "#2c3e50": 5,
+            "#3498db": 5,
+            "#c0392b": 1,
+            "#95a5a6": 8,
+            "#e67e22": 30,
+            "#8e44ad": 201,
+            "#27ae60": 3,
+        }
         return cmap.get(hex_color, 7)
 
     def save_json(self, filepath):
         data = {"layers": self.layers, "entities": [], "version": "2.0"}
         for e in self.entities:
-            d = {"type": type(e).__name__, "layer": e.layer, "color": e.color,
-                 "line_width": e.line_width}
-            if isinstance(e, CADLine):
-                d["p1"] = {"x": e.p1.x, "y": e.p1.y}
-                d["p2"] = {"x": e.p2.x, "y": e.p2.y}
-            elif isinstance(e, CADRectangle):
+            d = {
+                "type": type(e).__name__,
+                "layer": e.layer,
+                "color": e.color,
+                "line_width": e.line_width,
+            }
+            if isinstance(e, CADLine | CADRectangle):
                 d["p1"] = {"x": e.p1.x, "y": e.p1.y}
                 d["p2"] = {"x": e.p2.x, "y": e.p2.y}
             elif isinstance(e, CADCircle):
@@ -1226,8 +1453,12 @@ class CADEditor:
                 d["points"] = [{"x": p.x, "y": p.y} for p in e.points]
                 d["closed"] = e.closed
             elif isinstance(e, CADText):
-                d["x"] = e.x; d["y"] = e.y; d["text"] = e.text
-                d["height"] = e.height; d["angle"] = e.angle; d["align"] = e.align
+                d["x"] = e.x
+                d["y"] = e.y
+                d["text"] = e.text
+                d["height"] = e.height
+                d["angle"] = e.angle
+                d["align"] = e.align
             elif isinstance(e, CADHatch):
                 d["boundary"] = [{"x": p.x, "y": p.y} for p in e.boundary]
                 d["hatch_angle"] = e.hatch_angle
@@ -1237,12 +1468,12 @@ class CADEditor:
                 d["radius"] = e.radius
                 d["label"] = e.label
             data["entities"].append(d)
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         return filepath
 
     def load_json(self, filepath):
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, encoding="utf-8") as f:
             data = json.load(f)
         self.layers = data.get("layers", self.layers)
         self.entities.clear()
@@ -1255,43 +1486,66 @@ class CADEditor:
 
     def _entity_from_dict(self, d):
         t = d.get("type")
-        kw = {"layer": d.get("layer", "0"), "color": d.get("color", "#2c3e50"),
-              "line_width": d.get("line_width", 1)}
+        kw = {
+            "layer": d.get("layer", "0"),
+            "color": d.get("color", "#2c3e50"),
+            "line_width": d.get("line_width", 1),
+        }
         if t == "CADLine":
-            return CADLine(CADPoint(d["p1"]["x"], d["p1"]["y"]),
-                          CADPoint(d["p2"]["x"], d["p2"]["y"]), **kw)
+            return CADLine(
+                CADPoint(d["p1"]["x"], d["p1"]["y"]), CADPoint(d["p2"]["x"], d["p2"]["y"]), **kw
+            )
         elif t == "CADRectangle":
-            return CADRectangle(CADPoint(d["p1"]["x"], d["p1"]["y"]),
-                                CADPoint(d["p2"]["x"], d["p2"]["y"]), **kw)
+            return CADRectangle(
+                CADPoint(d["p1"]["x"], d["p1"]["y"]), CADPoint(d["p2"]["x"], d["p2"]["y"]), **kw
+            )
         elif t == "CADCircle":
             return CADCircle(CADPoint(d["center"]["x"], d["center"]["y"]), d["radius"], **kw)
         elif t == "CADDimension":
-            return CADDimension(CADPoint(d["p1"]["x"], d["p1"]["y"]),
-                                CADPoint(d["p2"]["x"], d["p2"]["y"]),
-                                d.get("offset", 15), d.get("text"), **kw)
+            return CADDimension(
+                CADPoint(d["p1"]["x"], d["p1"]["y"]),
+                CADPoint(d["p2"]["x"], d["p2"]["y"]),
+                d.get("offset", 15),
+                d.get("text"),
+                **kw,
+            )
         elif t == "CADArc":
-            return CADArc(CADPoint(d["center"]["x"], d["center"]["y"]),
-                          d["radius"], d["start_angle"], d["end_angle"], **kw)
+            return CADArc(
+                CADPoint(d["center"]["x"], d["center"]["y"]),
+                d["radius"],
+                d["start_angle"],
+                d["end_angle"],
+                **kw,
+            )
         elif t == "CADPolyline":
             pts = [CADPoint(p["x"], p["y"]) for p in d.get("points", [])]
             return CADPolyline(pts, d.get("closed", False), **kw)
         elif t == "CADText":
-            return CADText(d["x"], d["y"], d.get("text", ""), d.get("height", 10),
-                          d.get("angle", 0), d.get("align", "left"), **kw)
+            return CADText(
+                d["x"],
+                d["y"],
+                d.get("text", ""),
+                d.get("height", 10),
+                d.get("angle", 0),
+                d.get("align", "left"),
+                **kw,
+            )
         elif t == "CADHatch":
             pts = [CADPoint(p["x"], p["y"]) for p in d.get("boundary", [])]
             return CADHatch(pts, d.get("hatch_angle", 45), d.get("spacing", 5), **kw)
         elif t == "CADHole":
-            return CADHole(CADPoint(d["center"]["x"], d["center"]["y"]),
-                          d["radius"], d.get("label", ""), **kw)
+            return CADHole(
+                CADPoint(d["center"]["x"], d["center"]["y"]), d["radius"], d.get("label", ""), **kw
+            )
         return None
+
 
 # ===================== gui =====================
 
 
-
 class _Tooltip:
     """Внутрішній клас для підказок — коротка (одразу) та довга (через 3 с)"""
+
     def __init__(self, widget, short_text, long_text, delay_short=300, delay_long=3000):
         self.widget = widget
         self.short_text = short_text
@@ -1317,13 +1571,11 @@ class _Tooltip:
 
     def _show_short(self):
         self._hide()
-        self._create_tip(self.short_text, bg="#2c3e50", fg="#ecf0f1",
-                         font=("Segoe UI", 9, "bold"))
+        self._create_tip(self.short_text, bg="#2c3e50", fg="#ecf0f1", font=("Segoe UI", 9, "bold"))
 
     def _show_long(self):
         self._hide()
-        self._create_tip(self.long_text, bg="#fff3cd", fg="#856404",
-                         font=("Segoe UI", 9), border=1)
+        self._create_tip(self.long_text, bg="#fff3cd", fg="#856404", font=("Segoe UI", 9), border=1)
 
     def _create_tip(self, text, bg, fg, font, border=0):
         x = self.widget.winfo_rootx() + self.widget.winfo_width() // 2
@@ -1331,9 +1583,17 @@ class _Tooltip:
         self.tip_window = tk.Toplevel(self.widget)
         self.tip_window.wm_overrideredirect(True)
         self.tip_window.wm_geometry(f"+{x}+{y}")
-        label = tk.Label(self.tip_window, text=text, background=bg, foreground=fg,
-                         font=font, relief=tk.SOLID if border else tk.FLAT,
-                         borderwidth=border, padx=8, pady=4)
+        label = tk.Label(
+            self.tip_window,
+            text=text,
+            background=bg,
+            foreground=fg,
+            font=font,
+            relief=tk.SOLID if border else tk.FLAT,
+            borderwidth=border,
+            padx=8,
+            pady=4,
+        )
         label.pack()
 
     def _hide(self):
@@ -1344,16 +1604,50 @@ class _Tooltip:
 
 class CADEditorFrame(tk.Frame):
     """GUI-фрейм CAD-редактора — Покращена версія 2.0"""
-    TOOLS = ["select", "line", "rectangle", "circle", "arc", "polyline",
-             "dimension", "text", "hole", "hatch",
-             "move", "rotate", "copy", "mirror", "offset",
-             "trim", "break", "fillet", "chamfer", "pan"]
+
+    TOOLS = [
+        "select",
+        "line",
+        "rectangle",
+        "circle",
+        "arc",
+        "polyline",
+        "dimension",
+        "text",
+        "hole",
+        "hatch",
+        "move",
+        "rotate",
+        "copy",
+        "mirror",
+        "offset",
+        "trim",
+        "break",
+        "fillet",
+        "chamfer",
+        "pan",
+    ]
     TOOL_ICONS = {
-        "select": "🖱", "line": "📏", "rectangle": "▭", "circle": "○",
-        "arc": "⌒", "polyline": "〰", "dimension": "📐", "text": "T",
-        "hole": "◉", "hatch": "▦", "move": "↔", "rotate": "↻",
-        "copy": "⎘", "mirror": "⇄", "offset": "⇥", "trim": "✂",
-        "break": "⤨", "fillet": "⊃", "chamfer": "⊏", "pan": "✋"
+        "select": "🖱",
+        "line": "📏",
+        "rectangle": "▭",
+        "circle": "○",
+        "arc": "⌒",
+        "polyline": "〰",
+        "dimension": "📐",
+        "text": "T",
+        "hole": "◉",
+        "hatch": "▦",
+        "move": "↔",
+        "rotate": "↻",
+        "copy": "⎘",
+        "mirror": "⇄",
+        "offset": "⇥",
+        "trim": "✂",
+        "break": "⤨",
+        "fillet": "⊃",
+        "chamfer": "⊏",
+        "pan": "✋",
     }
     TOOL_HINTS = {
         "select": "Клік — вибір. Drag — рамка. Ctrl+клік — додати до вибору.",
@@ -1379,20 +1673,39 @@ class CADEditorFrame(tk.Frame):
     }
 
     TOOL_NAMES = {
-        "select": "Вибір", "line": "Лінія", "rectangle": "Прямокутник",
-        "circle": "Коло", "arc": "Дуга", "polyline": "Полілінія",
-        "dimension": "Розмір", "text": "Текст", "hole": "Отвір", "hatch": "Штрихування",
-        "move": "Перемістити", "rotate": "Обертання", "copy": "Копіювати",
-        "mirror": "Дзеркало", "offset": "Офсет", "trim": "Обрізати",
-        "break": "Розірвати", "fillet": "Скруглення", "chamfer": "Фаска", "pan": "Панорама"
+        "select": "Вибір",
+        "line": "Лінія",
+        "rectangle": "Прямокутник",
+        "circle": "Коло",
+        "arc": "Дуга",
+        "polyline": "Полілінія",
+        "dimension": "Розмір",
+        "text": "Текст",
+        "hole": "Отвір",
+        "hatch": "Штрихування",
+        "move": "Перемістити",
+        "rotate": "Обертання",
+        "copy": "Копіювати",
+        "mirror": "Дзеркало",
+        "offset": "Офсет",
+        "trim": "Обрізати",
+        "break": "Розірвати",
+        "fillet": "Скруглення",
+        "chamfer": "Фаска",
+        "pan": "Панорама",
     }
 
     def __init__(self, parent, colors=None, **kwargs):
         super().__init__(parent, **kwargs)
         defaults = {
-            "bg": "#f0f0f0", "fg": "#333333", "accent": "#3498db",
-            "card": "white", "sidebar": "#2c3e50", "sidebar_fg": "white",
-            "toolbar": "#34495e", "status": "#ecf0f1"
+            "bg": "#f0f0f0",
+            "fg": "#333333",
+            "accent": "#3498db",
+            "card": "white",
+            "sidebar": "#2c3e50",
+            "sidebar_fg": "white",
+            "toolbar": "#34495e",
+            "status": "#ecf0f1",
         }
         self.colors = {**defaults, **(colors or {})}
         self.configure(bg=self.colors["bg"])
@@ -1415,8 +1728,13 @@ class CADEditorFrame(tk.Frame):
         self._last_drag_point = None
 
         self.snap_modes = {
-            "grid": True, "ortho": False, "endpoint": True, "midpoint": False,
-            "center": False, "intersection": False, "tangent": False,
+            "grid": True,
+            "ortho": False,
+            "endpoint": True,
+            "midpoint": False,
+            "center": False,
+            "intersection": False,
+            "tangent": False,
         }
 
         self.build_ui()
@@ -1427,100 +1745,221 @@ class CADEditorFrame(tk.Frame):
         toolbar.pack(fill=tk.X, pady=(0, 1))
         toolbar.pack_propagate(False)
 
-        tk.Label(toolbar, text="🔧", bg=self.colors["toolbar"], fg="white",
-                 font=("Segoe UI", 12)).pack(side=tk.LEFT, padx=(10, 5))
+        tk.Label(
+            toolbar, text="🔧", bg=self.colors["toolbar"], fg="white", font=("Segoe UI", 12)
+        ).pack(side=tk.LEFT, padx=(10, 5))
 
         self.tool_buttons = {}
-        draw_tools = ["select", "line", "rectangle", "circle", "arc", "polyline",
-                      "dimension", "text", "hole", "hatch"]
-        edit_tools = ["move", "rotate", "copy", "mirror", "offset",
-                      "trim", "break", "fillet", "chamfer", "pan"]
+        draw_tools = [
+            "select",
+            "line",
+            "rectangle",
+            "circle",
+            "arc",
+            "polyline",
+            "dimension",
+            "text",
+            "hole",
+            "hatch",
+        ]
+        edit_tools = [
+            "move",
+            "rotate",
+            "copy",
+            "mirror",
+            "offset",
+            "trim",
+            "break",
+            "fillet",
+            "chamfer",
+            "pan",
+        ]
 
         for tool in draw_tools:
-            btn = tk.Button(toolbar, text=f"{self.TOOL_ICONS[tool]}",
-                           bg=self.colors["toolbar"], fg="white", font=("Segoe UI", 10),
-                           bd=0, width=3, cursor="hand2",
-                           command=lambda t=tool: self.set_tool(t))
+            btn = tk.Button(
+                toolbar,
+                text=f"{self.TOOL_ICONS[tool]}",
+                bg=self.colors["toolbar"],
+                fg="white",
+                font=("Segoe UI", 10),
+                bd=0,
+                width=3,
+                cursor="hand2",
+                command=lambda t=tool: self.set_tool(t),
+            )
             btn.pack(side=tk.LEFT, padx=1)
             self.tool_buttons[tool] = btn
             _Tooltip(btn, self.TOOL_NAMES[tool], self.TOOL_HINTS[tool])
 
-        tk.Label(toolbar, text="│", bg=self.colors["toolbar"], fg="#7f8c8d",
-                 font=("Segoe UI", 14)).pack(side=tk.LEFT, padx=5)
+        tk.Label(
+            toolbar, text="│", bg=self.colors["toolbar"], fg="#7f8c8d", font=("Segoe UI", 14)
+        ).pack(side=tk.LEFT, padx=5)
 
         for tool in edit_tools:
-            btn = tk.Button(toolbar, text=f"{self.TOOL_ICONS[tool]}",
-                           bg=self.colors["toolbar"], fg="white", font=("Segoe UI", 10),
-                           bd=0, width=3, cursor="hand2",
-                           command=lambda t=tool: self.set_tool(t))
+            btn = tk.Button(
+                toolbar,
+                text=f"{self.TOOL_ICONS[tool]}",
+                bg=self.colors["toolbar"],
+                fg="white",
+                font=("Segoe UI", 10),
+                bd=0,
+                width=3,
+                cursor="hand2",
+                command=lambda t=tool: self.set_tool(t),
+            )
             btn.pack(side=tk.LEFT, padx=1)
             self.tool_buttons[tool] = btn
             _Tooltip(btn, self.TOOL_NAMES[tool], self.TOOL_HINTS[tool])
 
         self._highlight_tool("select")
 
-        tk.Label(toolbar, text="│", bg=self.colors["toolbar"], fg="#7f8c8d",
-                 font=("Segoe UI", 14)).pack(side=tk.LEFT, padx=5)
-        btn_undo = tk.Button(toolbar, text="↩", bg=self.colors["toolbar"], fg="#f1c40f",
-                  font=("Segoe UI", 12, "bold"), bd=0, width=3,
-                  command=self.undo)
+        tk.Label(
+            toolbar, text="│", bg=self.colors["toolbar"], fg="#7f8c8d", font=("Segoe UI", 14)
+        ).pack(side=tk.LEFT, padx=5)
+        btn_undo = tk.Button(
+            toolbar,
+            text="↩",
+            bg=self.colors["toolbar"],
+            fg="#f1c40f",
+            font=("Segoe UI", 12, "bold"),
+            bd=0,
+            width=3,
+            command=self.undo,
+        )
         btn_undo.pack(side=tk.LEFT)
         _Tooltip(btn_undo, "Скасувати", "Скасувати останню дію (Ctrl+Z)")
-        btn_redo = tk.Button(toolbar, text="↪", bg=self.colors["toolbar"], fg="#f1c40f",
-                  font=("Segoe UI", 12, "bold"), bd=0, width=3,
-                  command=self.redo)
+        btn_redo = tk.Button(
+            toolbar,
+            text="↪",
+            bg=self.colors["toolbar"],
+            fg="#f1c40f",
+            font=("Segoe UI", 12, "bold"),
+            bd=0,
+            width=3,
+            command=self.redo,
+        )
         btn_redo.pack(side=tk.LEFT)
         _Tooltip(btn_redo, "Повернути", "Повернути скасовану дію (Ctrl+Y)")
 
-        tk.Label(toolbar, text="│", bg=self.colors["toolbar"], fg="#7f8c8d",
-                 font=("Segoe UI", 14)).pack(side=tk.LEFT, padx=5)
-        btn_zin = tk.Button(toolbar, text="⊕", bg=self.colors["toolbar"], fg="white",
-                  font=("Segoe UI", 10, "bold"), bd=0, width=3,
-                  command=self.zoom_in)
+        tk.Label(
+            toolbar, text="│", bg=self.colors["toolbar"], fg="#7f8c8d", font=("Segoe UI", 14)
+        ).pack(side=tk.LEFT, padx=5)
+        btn_zin = tk.Button(
+            toolbar,
+            text="⊕",
+            bg=self.colors["toolbar"],
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            bd=0,
+            width=3,
+            command=self.zoom_in,
+        )
         btn_zin.pack(side=tk.LEFT)
         _Tooltip(btn_zin, "Збільшити", "Збільшити масштаб")
-        self.zoom_label = tk.Label(toolbar, text="100%", bg=self.colors["toolbar"], fg="white",
-                                   font=("Segoe UI", 10), width=8)
+        self.zoom_label = tk.Label(
+            toolbar,
+            text="100%",
+            bg=self.colors["toolbar"],
+            fg="white",
+            font=("Segoe UI", 10),
+            width=8,
+        )
         self.zoom_label.pack(side=tk.LEFT)
-        btn_zout = tk.Button(toolbar, text="⊖", bg=self.colors["toolbar"], fg="white",
-                  font=("Segoe UI", 10, "bold"), bd=0, width=3,
-                  command=self.zoom_out)
+        btn_zout = tk.Button(
+            toolbar,
+            text="⊖",
+            bg=self.colors["toolbar"],
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            bd=0,
+            width=3,
+            command=self.zoom_out,
+        )
         btn_zout.pack(side=tk.LEFT)
         _Tooltip(btn_zout, "Зменшити", "Зменшити масштаб")
-        btn_zrst = tk.Button(toolbar, text="⊘", bg=self.colors["toolbar"], fg="white",
-                  font=("Segoe UI", 10, "bold"), bd=0, width=3,
-                  command=self.zoom_reset)
+        btn_zrst = tk.Button(
+            toolbar,
+            text="⊘",
+            bg=self.colors["toolbar"],
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            bd=0,
+            width=3,
+            command=self.zoom_reset,
+        )
         btn_zrst.pack(side=tk.LEFT)
         _Tooltip(btn_zrst, "Скидання масштабу", "Масштаб 100%, центрування")
-        btn_zext = tk.Button(toolbar, text="⬛", bg=self.colors["toolbar"], fg="white",
-                  font=("Segoe UI", 10, "bold"), bd=0, width=3,
-                  command=self.zoom_extents)
+        btn_zext = tk.Button(
+            toolbar,
+            text="⬛",
+            bg=self.colors["toolbar"],
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            bd=0,
+            width=3,
+            command=self.zoom_extents,
+        )
         btn_zext.pack(side=tk.LEFT)
         _Tooltip(btn_zext, "Вмістити все", "Показати всі об'єкти у вікні")
 
-        btn_save = tk.Button(toolbar, text="💾", bg="#27ae60", fg="white",
-                  font=("Segoe UI", 10, "bold"), bd=0, width=4,
-                  command=self.save_drawing)
+        btn_save = tk.Button(
+            toolbar,
+            text="💾",
+            bg="#27ae60",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            bd=0,
+            width=4,
+            command=self.save_drawing,
+        )
         btn_save.pack(side=tk.RIGHT, padx=10)
         _Tooltip(btn_save, "Зберегти", "Зберегти креслення у форматі JSON")
-        btn_load = tk.Button(toolbar, text="📂", bg="#2980b9", fg="white",
-                  font=("Segoe UI", 10, "bold"), bd=0, width=4,
-                  command=self.load_drawing)
+        btn_load = tk.Button(
+            toolbar,
+            text="📂",
+            bg="#2980b9",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            bd=0,
+            width=4,
+            command=self.load_drawing,
+        )
         btn_load.pack(side=tk.RIGHT, padx=2)
         _Tooltip(btn_load, "Відкрити", "Завантажити креслення з JSON")
-        btn_svg = tk.Button(toolbar, text="🖼", bg="#8e44ad", fg="white",
-                  font=("Segoe UI", 10, "bold"), bd=0, width=4,
-                  command=self.export_svg)
+        btn_svg = tk.Button(
+            toolbar,
+            text="🖼",
+            bg="#8e44ad",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            bd=0,
+            width=4,
+            command=self.export_svg,
+        )
         btn_svg.pack(side=tk.RIGHT, padx=2)
         _Tooltip(btn_svg, "Експорт SVG", "Експортувати креслення у SVG")
-        btn_dxf = tk.Button(toolbar, text="📄", bg="#16a085", fg="white",
-                  font=("Segoe UI", 10, "bold"), bd=0, width=4,
-                  command=self.export_dxf)
+        btn_dxf = tk.Button(
+            toolbar,
+            text="📄",
+            bg="#16a085",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            bd=0,
+            width=4,
+            command=self.export_dxf,
+        )
         btn_dxf.pack(side=tk.RIGHT, padx=2)
         _Tooltip(btn_dxf, "Експорт DXF", "Експортувати креслення у DXF")
-        btn_clear = tk.Button(toolbar, text="🗑", bg="#c0392b", fg="white",
-                  font=("Segoe UI", 10, "bold"), bd=0, width=4,
-                  command=self.clear_drawing)
+        btn_clear = tk.Button(
+            toolbar,
+            text="🗑",
+            bg="#c0392b",
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            bd=0,
+            width=4,
+            command=self.clear_drawing,
+        )
         btn_clear.pack(side=tk.RIGHT, padx=2)
         _Tooltip(btn_clear, "Очистити", "Очистити все креслення")
 
@@ -1543,18 +1982,42 @@ class CADEditorFrame(tk.Frame):
         right.pack(side=tk.RIGHT, fill=tk.Y, padx=(0, 4), pady=4)
         right.pack_propagate(False)
 
-        coord_frame = tk.LabelFrame(right, text="📍 Координати", bg=self.colors["card"],
-                                    fg=self.colors["fg"], font=("Segoe UI", 10, "bold"), padx=8, pady=8)
+        coord_frame = tk.LabelFrame(
+            right,
+            text="📍 Координати",
+            bg=self.colors["card"],
+            fg=self.colors["fg"],
+            font=("Segoe UI", 10, "bold"),
+            padx=8,
+            pady=8,
+        )
         coord_frame.pack(fill=tk.X, padx=8, pady=(8, 4))
-        self.coord_label = tk.Label(coord_frame, text="X: 0.0  Y: 0.0", bg=self.colors["card"],
-                                    fg=self.colors["fg"], font=("Segoe UI", 10, "bold"))
+        self.coord_label = tk.Label(
+            coord_frame,
+            text="X: 0.0  Y: 0.0",
+            bg=self.colors["card"],
+            fg=self.colors["fg"],
+            font=("Segoe UI", 10, "bold"),
+        )
         self.coord_label.pack()
-        self.snap_label = tk.Label(coord_frame, text="Snap: grid", bg=self.colors["card"],
-                                   fg="#27ae60", font=("Segoe UI", 8))
+        self.snap_label = tk.Label(
+            coord_frame,
+            text="Snap: grid",
+            bg=self.colors["card"],
+            fg="#27ae60",
+            font=("Segoe UI", 8),
+        )
         self.snap_label.pack()
 
-        snap_frame = tk.LabelFrame(right, text="⚙️ Прив'язка (Snap)", bg=self.colors["card"],
-                                   fg=self.colors["fg"], font=("Segoe UI", 10, "bold"), padx=8, pady=8)
+        snap_frame = tk.LabelFrame(
+            right,
+            text="⚙️ Прив'язка (Snap)",
+            bg=self.colors["card"],
+            fg=self.colors["fg"],
+            font=("Segoe UI", 10, "bold"),
+            padx=8,
+            pady=8,
+        )
         snap_frame.pack(fill=tk.X, padx=8, pady=4)
         self.snap_vars = {}
         snap_items = [
@@ -1570,28 +2033,61 @@ class CADEditorFrame(tk.Frame):
             var = tk.BooleanVar(value=default)
             self.snap_vars[key] = var
             self.snap_modes[key] = default
-            cb = tk.Checkbutton(snap_frame, text=label, variable=var, bg=self.colors["card"],
-                               font=("Segoe UI", 10),
-                               command=lambda k=key, v=var: self._update_snap(k, v))
+            cb = tk.Checkbutton(
+                snap_frame,
+                text=label,
+                variable=var,
+                bg=self.colors["card"],
+                font=("Segoe UI", 10),
+                command=lambda k=key, v=var: self._update_snap(k, v),
+            )
             cb.pack(anchor=tk.W, pady=1)
 
-        tk.Label(snap_frame, text="Крок сітки (мм):", bg=self.colors["card"],
-                 font=("Segoe UI", 10)).pack(anchor=tk.W, pady=(5, 2))
+        tk.Label(
+            snap_frame, text="Крок сітки (мм):", bg=self.colors["card"], font=("Segoe UI", 10)
+        ).pack(anchor=tk.W, pady=(5, 2))
         self.grid_entry = tk.Entry(snap_frame, width=10, font=("Segoe UI", 10))
         self.grid_entry.insert(0, "10")
         self.grid_entry.pack(anchor=tk.W)
-        tk.Button(snap_frame, text="Застосувати", bg=self.colors["accent"], fg="white",
-                  font=("Segoe UI", 9), command=self.apply_grid).pack(anchor=tk.W, pady=5)
+        tk.Button(
+            snap_frame,
+            text="Застосувати",
+            bg=self.colors["accent"],
+            fg="white",
+            font=("Segoe UI", 9),
+            command=self.apply_grid,
+        ).pack(anchor=tk.W, pady=5)
 
-        self.prop_frame = tk.LabelFrame(right, text="📋 Властивості", bg=self.colors["card"],
-                                        fg=self.colors["fg"], font=("Segoe UI", 10, "bold"), padx=8, pady=8)
+        self.prop_frame = tk.LabelFrame(
+            right,
+            text="📋 Властивості",
+            bg=self.colors["card"],
+            fg=self.colors["fg"],
+            font=("Segoe UI", 10, "bold"),
+            padx=8,
+            pady=8,
+        )
         self.prop_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
-        self.prop_text = tk.Text(self.prop_frame, wrap="word", font=("Segoe UI", 9),
-                                 bg="#fafafa", relief=tk.FLAT, height=10, state="disabled")
+        self.prop_text = tk.Text(
+            self.prop_frame,
+            wrap="word",
+            font=("Segoe UI", 9),
+            bg="#fafafa",
+            relief=tk.FLAT,
+            height=10,
+            state="disabled",
+        )
         self.prop_text.pack(fill=tk.BOTH, expand=True)
 
-        layer_frame = tk.LabelFrame(right, text="🗂️ Шари", bg=self.colors["card"],
-                                    fg=self.colors["fg"], font=("Segoe UI", 10, "bold"), padx=8, pady=8)
+        layer_frame = tk.LabelFrame(
+            right,
+            text="🗂️ Шари",
+            bg=self.colors["card"],
+            fg=self.colors["fg"],
+            font=("Segoe UI", 10, "bold"),
+            padx=8,
+            pady=8,
+        )
         layer_frame.pack(fill=tk.X, padx=8, pady=4)
         self.layer_vars = {}
         for layer_name, layer_data in self.cad.layers.items():
@@ -1599,17 +2095,27 @@ class CADEditorFrame(tk.Frame):
             self.layer_vars[layer_name] = var
             row = tk.Frame(layer_frame, bg=self.colors["card"])
             row.pack(fill=tk.X, pady=1)
-            tk.Checkbutton(row, variable=var, bg=self.colors["card"],
-                          command=lambda l=layer_name: self.toggle_layer(l)).pack(side=tk.LEFT)
-            tk.Label(row, text=f"{layer_data['name']} ({layer_name})", bg=self.colors["card"],
-                     fg=layer_data["color"], font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=5)
+            tk.Checkbutton(
+                row,
+                variable=var,
+                bg=self.colors["card"],
+                command=lambda _layer=layer_name: self.toggle_layer(_layer),
+            ).pack(side=tk.LEFT)
+            tk.Label(
+                row,
+                text=f"{layer_data['name']} ({layer_name})",
+                bg=self.colors["card"],
+                fg=layer_data["color"],
+                font=("Segoe UI", 9),
+            ).pack(side=tk.LEFT, padx=5)
 
         bottom = tk.Frame(self, bg=self.colors["status"], height=32, bd=1, relief=tk.RIDGE)
         bottom.pack(fill=tk.X, side=tk.BOTTOM)
         bottom.pack_propagate(False)
 
-        tk.Label(bottom, text="Координати:", bg=self.colors["status"],
-                 font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(10, 2))
+        tk.Label(bottom, text="Координати:", bg=self.colors["status"], font=("Segoe UI", 9)).pack(
+            side=tk.LEFT, padx=(10, 2)
+        )
         self.coord_entry = tk.Entry(bottom, width=20, font=("Segoe UI", 9))
         self.coord_entry.pack(side=tk.LEFT, padx=2)
         self.coord_entry.bind("<Return>", self.on_coord_entry)
@@ -1618,26 +2124,46 @@ class CADEditorFrame(tk.Frame):
         self.coord_entry.bind("<FocusIn>", lambda e: self._on_entry_focus_in())
         self.coord_entry.bind("<FocusOut>", lambda e: self._on_entry_focus_out())
 
-        tk.Button(bottom, text="↵ Ввести", bg=self.colors["accent"], fg="white",
-                  font=("Segoe UI", 8), command=lambda: self.on_coord_entry(None)).pack(side=tk.LEFT, padx=2)
+        tk.Button(
+            bottom,
+            text="↵ Ввести",
+            bg=self.colors["accent"],
+            fg="white",
+            font=("Segoe UI", 8),
+            command=lambda: self.on_coord_entry(None),
+        ).pack(side=tk.LEFT, padx=2)
 
-        tk.Label(bottom, text="│", bg=self.colors["status"],
-                 fg="#7f8c8d", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=5)
+        tk.Label(
+            bottom, text="│", bg=self.colors["status"], fg="#7f8c8d", font=("Segoe UI", 9)
+        ).pack(side=tk.LEFT, padx=5)
 
-        tk.Label(bottom, text="Розмір:", bg=self.colors["status"],
-                 font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(2, 0))
+        tk.Label(bottom, text="Розмір:", bg=self.colors["status"], font=("Segoe UI", 9)).pack(
+            side=tk.LEFT, padx=(2, 0)
+        )
         self.size_entry = tk.Entry(bottom, width=12, font=("Segoe UI", 9), state="disabled")
         self.size_entry.pack(side=tk.LEFT, padx=2)
         self.size_entry.bind("<Return>", self.on_size_entry)
-        tk.Button(bottom, text="↵ Застосувати", bg=self.colors["accent"], fg="white",
-                  font=("Segoe UI", 8), command=lambda: self.on_size_entry(None)).pack(side=tk.LEFT, padx=2)
+        tk.Button(
+            bottom,
+            text="↵ Застосувати",
+            bg=self.colors["accent"],
+            fg="white",
+            font=("Segoe UI", 8),
+            command=lambda: self.on_size_entry(None),
+        ).pack(side=tk.LEFT, padx=2)
 
-        self.status_label = tk.Label(bottom, text="Готово — клікніть для початку креслення",
-                                     bg=self.colors["status"], fg="#666", font=("Segoe UI", 9))
+        self.status_label = tk.Label(
+            bottom,
+            text="Готово — клікніть для початку креслення",
+            bg=self.colors["status"],
+            fg="#666",
+            font=("Segoe UI", 9),
+        )
         self.status_label.pack(side=tk.LEFT, padx=(20, 0))
 
-        self.undo_label = tk.Label(bottom, text="", bg=self.colors["status"],
-                                   fg="#7f8c8d", font=("Segoe UI", 8))
+        self.undo_label = tk.Label(
+            bottom, text="", bg=self.colors["status"], fg="#7f8c8d", font=("Segoe UI", 8)
+        )
         self.undo_label.pack(side=tk.RIGHT, padx=10)
 
         self.draw_grid()
@@ -1655,7 +2181,9 @@ class CADEditorFrame(tk.Frame):
     def _update_snap(self, key, var):
         self.snap_modes[key] = var.get()
         active = [k for k, v in self.snap_modes.items() if v]
-        self.snap_label.config(text=f"Snap: {', '.join(active[:3])}{'...' if len(active) > 3 else ''}")
+        self.snap_label.config(
+            text=f"Snap: {', '.join(active[:3])}{'...' if len(active) > 3 else ''}"
+        )
 
     def _highlight_tool(self, tool):
         for t, btn in self.tool_buttons.items():
@@ -1772,19 +2300,28 @@ class CADEditorFrame(tk.Frame):
 
     def on_key(self, event):
         if event.state & 0x4 and event.keysym.lower() == "z":
-            self.undo(); return
+            self.undo()
+            return
         if event.state & 0x4 and event.keysym.lower() == "y":
-            self.redo(); return
+            self.redo()
+            return
         if event.state & 0x4 and event.keysym.lower() == "a":
-            self.cad.select_all(); self.redraw(); self.update_properties(); return
+            self.cad.select_all()
+            self.redraw()
+            self.update_properties()
+            return
         if event.state & 0x4 and event.keysym.lower() == "c":
             self.clipboard = self.cad.copy_selected()
             self.status_label.config(text=f"Скопійовано {len(self.clipboard)} об'єктів")
             return
         if event.state & 0x4 and event.keysym.lower() == "v":
-            self.paste_clipboard(); return
+            self.paste_clipboard()
+            return
         if event.keysym == "Delete":
-            self.cad.delete_selected(); self.redraw(); self.update_properties(); self._update_undo_label()
+            self.cad.delete_selected()
+            self.redraw()
+            self.update_properties()
+            self._update_undo_label()
         elif event.keysym == "Escape":
             self.cancel_current()
         elif event.keysym in ("Return", "KP_Enter"):
@@ -1861,10 +2398,14 @@ class CADEditorFrame(tk.Frame):
 
     def _get_snapped_pos(self, event, base_point=None):
         wx, wy = self._get_world_pos(event)
-        p, stype = self.cad.snap_point(wx, wy, self.snap_modes,
-                                        self.cad.get_visible_entities(),
-                                        self.canvas.winfo_width(),
-                                        self.canvas.winfo_height())
+        p, stype = self.cad.snap_point(
+            wx,
+            wy,
+            self.snap_modes,
+            self.cad.get_visible_entities(),
+            self.canvas.winfo_width(),
+            self.canvas.winfo_height(),
+        )
         if base_point and self.snap_modes.get("ortho", False):
             p = self.cad.apply_ortho(base_point.x, base_point.y, p.x, p.y)
             stype = "ortho"
@@ -1876,12 +2417,20 @@ class CADEditorFrame(tk.Frame):
         h = self.canvas.winfo_height()
         sx, sy = self.cad.world_to_screen(p.x, p.y, w, h)
         r = 6
-        colors = {"grid": "#3498db", "ortho": "#e67e22", "endpoint": "#27ae60",
-                  "midpoint": "#9b59b6", "center": "#e74c3c", "quadrant": "#f39c12",
-                  "insert": "#8e44ad", "free": "#95a5a6"}
+        colors = {
+            "grid": "#3498db",
+            "ortho": "#e67e22",
+            "endpoint": "#27ae60",
+            "midpoint": "#9b59b6",
+            "center": "#e74c3c",
+            "quadrant": "#f39c12",
+            "insert": "#8e44ad",
+            "free": "#95a5a6",
+        }
         color = colors.get(stype, "#3498db")
-        self.canvas.create_oval(sx - r, sy - r, sx + r, sy + r, outline=color,
-                               width=2, tags="snap_marker")
+        self.canvas.create_oval(
+            sx - r, sy - r, sx + r, sy + r, outline=color, width=2, tags="snap_marker"
+        )
         self.canvas.create_line(sx - r - 4, sy, sx + r + 4, sy, fill=color, tags="snap_marker")
         self.canvas.create_line(sx, sy - r - 4, sx, sy + r + 4, fill=color, tags="snap_marker")
         self.snap_label.config(text=f"Snap: {stype}", fg=color)
@@ -1902,14 +2451,16 @@ class CADEditorFrame(tk.Frame):
         tool = self.current_tool
 
         if tool == "select":
-            add = bool(event.state & 0x4)          # Ctrl
+            add = bool(event.state & 0x4)  # Ctrl
             ent = self.cad.select_at(p.x, p.y, tol=5, add=add)
             if ent:
                 self.status_label.config(text=f"Вибрано: {type(ent).__name__} #{ent.id}")
             else:
                 self.drag_start = p
-                self.drag_start_screen = (self.canvas.canvasx(event.x),
-                                          self.canvas.canvasy(event.y))
+                self.drag_start_screen = (
+                    self.canvas.canvasx(event.x),
+                    self.canvas.canvasy(event.y),
+                )
             self.redraw()
             self.update_properties()
 
@@ -1933,7 +2484,8 @@ class CADEditorFrame(tk.Frame):
             self.temp_points.append(p)
             self.drawing = True
             self.status_label.config(
-                text=f"Полілінія: {len(self.temp_points)} точок. Enter — замкнути, Esc — скасувати")
+                text=f"Полілінія: {len(self.temp_points)} точок. Enter — замкнути, Esc — скасувати"
+            )
             self.redraw()
 
         elif tool == "text":
@@ -1972,14 +2524,17 @@ class CADEditorFrame(tk.Frame):
 
         elif tool == "offset":
             ent = self.cad.select_at(p.x, p.y, tol=5, add=False)
-            if isinstance(ent, (CADLine, CADPolyline)):
+            if isinstance(ent, CADLine | CADPolyline):
                 if isinstance(ent, CADLine):
-                    x1, y1, x2, y2 = offset_line(ent.p1.x, ent.p1.y,
-                                                 ent.p2.x, ent.p2.y, 10)
+                    x1, y1, x2, y2 = offset_line(ent.p1.x, ent.p1.y, ent.p2.x, ent.p2.y, 10)
                     if x1 is not None:
                         new_line = CADLine(
-                            CADPoint(x1, y1), CADPoint(x2, y2),
-                            layer=ent.layer, color=ent.color, line_width=ent.line_width)
+                            CADPoint(x1, y1),
+                            CADPoint(x2, y2),
+                            layer=ent.layer,
+                            color=ent.color,
+                            line_width=ent.line_width,
+                        )
                         self.cad.add_entity(new_line)
                 elif isinstance(ent, CADPolyline):
                     new_poly = ent.offset(10)
@@ -2004,17 +2559,27 @@ class CADEditorFrame(tk.Frame):
                 x1, y1 = ent.p1.x, ent.p1.y
                 x2, y2 = ent.p2.x, ent.p2.y
                 dx, dy = x2 - x1, y2 - y1
-                len2 = dx*dx + dy*dy
+                len2 = dx * dx + dy * dy
                 if len2 > 0:
-                    t = max(0, min(1, ((px - x1)*dx + (py - y1)*dy) / len2))
+                    t = max(0, min(1, ((px - x1) * dx + (py - y1) * dy) / len2))
                     mx = x1 + t * dx
                     my = y1 + t * dy
                     if 0 < t < 1:
                         mid = CADPoint(mx, my)
-                        l1 = CADLine(ent.p1.copy(), mid,
-                                     layer=ent.layer, color=ent.color, line_width=ent.line_width)
-                        l2 = CADLine(mid, ent.p2.copy(),
-                                     layer=ent.layer, color=ent.color, line_width=ent.line_width)
+                        l1 = CADLine(
+                            ent.p1.copy(),
+                            mid,
+                            layer=ent.layer,
+                            color=ent.color,
+                            line_width=ent.line_width,
+                        )
+                        l2 = CADLine(
+                            mid,
+                            ent.p2.copy(),
+                            layer=ent.layer,
+                            color=ent.color,
+                            line_width=ent.line_width,
+                        )
                         self.cad.delete_entity(ent)
                         self.cad.add_entity(l1)
                         self.cad.add_entity(l2)
@@ -2026,7 +2591,9 @@ class CADEditorFrame(tk.Frame):
             self.status_label.config(text="Fillet: виберіть два відрізки (не реалізовано повністю)")
 
         elif tool == "chamfer":
-            self.status_label.config(text="Chamfer: виберіть два відрізки (не реалізовано повністю)")
+            self.status_label.config(
+                text="Chamfer: виберіть два відрізки (не реалізовано повністю)"
+            )
 
         elif tool == "pan":
             self.pan_start = (event.x, event.y)
@@ -2037,8 +2604,10 @@ class CADEditorFrame(tk.Frame):
         p, stype = self._get_snapped_pos(event, base_point=base)
         self._draw_snap_marker(p, stype)
 
-        if self.current_tool in ("line", "rectangle", "circle",
-                                 "dimension", "hole") and self.drawing:
+        if (
+            self.current_tool in ("line", "rectangle", "circle", "dimension", "hole")
+            and self.drawing
+        ):
             self._update_preview(p)
             self._update_size_entry(p)
             self._last_drag_point = p
@@ -2079,8 +2648,7 @@ class CADEditorFrame(tk.Frame):
             self._update_undo_label()
 
         elif tool == "rotate" and self.drawing:
-            angle = math.degrees(math.atan2(p.y - self.drag_start.y,
-                                            p.x - self.drag_start.x))
+            angle = math.degrees(math.atan2(p.y - self.drag_start.y, p.x - self.drag_start.x))
             self.cad.rotate_selected(self.drag_start.x, self.drag_start.y, angle)
             self.drawing = False
             self.drag_start = None
@@ -2146,30 +2714,46 @@ class CADEditorFrame(tk.Frame):
         color = self.colors["accent"]
 
         if self.current_tool == "line":
-            self.canvas.create_line(sx1, sy1, sx2, sy2, fill=color, width=2,
-                                    tags="preview", dash=(4, 4))
+            self.canvas.create_line(
+                sx1, sy1, sx2, sy2, fill=color, width=2, tags="preview", dash=(4, 4)
+            )
         elif self.current_tool == "rectangle":
-            self.canvas.create_rectangle(sx1, sy1, sx2, sy2, outline=color, width=2,
-                                         tags="preview", dash=(4, 4))
+            self.canvas.create_rectangle(
+                sx1, sy1, sx2, sy2, outline=color, width=2, tags="preview", dash=(4, 4)
+            )
         elif self.current_tool == "circle":
             r = math.hypot(p.x - self.drag_start.x, p.y - self.drag_start.y) * self.cad.scale
-            self.canvas.create_oval(sx1 - r, sy1 - r, sx1 + r, sy1 + r,
-                                    outline=color, width=2, tags="preview", dash=(4, 4))
+            self.canvas.create_oval(
+                sx1 - r,
+                sy1 - r,
+                sx1 + r,
+                sy1 + r,
+                outline=color,
+                width=2,
+                tags="preview",
+                dash=(4, 4),
+            )
         elif self.current_tool == "dimension":
-            self.canvas.create_line(sx1, sy1, sx2, sy2, fill=color, width=2,
-                                    tags="preview", dash=(4, 4))
+            self.canvas.create_line(
+                sx1, sy1, sx2, sy2, fill=color, width=2, tags="preview", dash=(4, 4)
+            )
             val = math.hypot(p.x - self.drag_start.x, p.y - self.drag_start.y)
             mx, my = (sx1 + sx2) / 2, (sy1 + sy2) / 2 - 10
-            self.canvas.create_text(mx, my, text=f"{val:.1f} мм",
-                                    fill=color, tags="preview")
+            self.canvas.create_text(mx, my, text=f"{val:.1f} мм", fill=color, tags="preview")
         elif self.current_tool == "hole":
             r = math.hypot(p.x - self.drag_start.x, p.y - self.drag_start.y) * self.cad.scale
-            self.canvas.create_oval(sx1 - r, sy1 - r, sx1 + r, sy1 + r,
-                                    outline=color, width=2, tags="preview", dash=(4, 4))
-            self.canvas.create_line(sx1 - r, sy1, sx1 + r, sy1,
-                                    fill=color, tags="preview")
-            self.canvas.create_line(sx1, sy1 - r, sx1, sy1 + r,
-                                    fill=color, tags="preview")
+            self.canvas.create_oval(
+                sx1 - r,
+                sy1 - r,
+                sx1 + r,
+                sy1 + r,
+                outline=color,
+                width=2,
+                tags="preview",
+                dash=(4, 4),
+            )
+            self.canvas.create_line(sx1 - r, sy1, sx1 + r, sy1, fill=color, tags="preview")
+            self.canvas.create_line(sx1, sy1 - r, sx1, sy1 + r, fill=color, tags="preview")
 
     def _update_preview_arc_cse(self, p):
         """Прев'ю для Center-Start-End дуги"""
@@ -2186,12 +2770,13 @@ class CADEditorFrame(tk.Frame):
         color = self.colors["accent"]
 
         # Центр
-        self.canvas.create_oval(scx-3, scy-3, scx+3, scy+3, fill=color, tags="preview")
+        self.canvas.create_oval(scx - 3, scy - 3, scx + 3, scy + 3, fill=color, tags="preview")
         # Радіус
-        self.canvas.create_line(scx, scy, ssx, ssy, fill=color, width=1,
-                                tags="preview", dash=(4, 4))
+        self.canvas.create_line(
+            scx, scy, ssx, ssy, fill=color, width=1, tags="preview", dash=(4, 4)
+        )
         # Початок
-        self.canvas.create_oval(ssx-3, ssy-3, ssx+3, ssy+3, fill=color, tags="preview")
+        self.canvas.create_oval(ssx - 3, ssy - 3, ssx + 3, ssy + 3, fill=color, tags="preview")
 
         # Дуга — знаковий extent
         start_angle = math.degrees(math.atan2(start.y - center.y, start.x - center.x))
@@ -2207,8 +2792,7 @@ class CADEditorFrame(tk.Frame):
             px = scx + sr * math.cos(rad)
             py = scy - sr * math.sin(rad)
             pts.extend([px, py])
-        self.canvas.create_line(pts, fill=color, width=2,
-                                tags="preview", dash=(4, 4))
+        self.canvas.create_line(pts, fill=color, width=2, tags="preview", dash=(4, 4))
 
     def _finish_arc_cse(self, p):
         """Завершити Center-Start-End дугу"""
@@ -2241,8 +2825,9 @@ class CADEditorFrame(tk.Frame):
         self.canvas.delete("selection_rect")
         sx, sy = self.canvas.canvasx(event.x), self.canvas.canvasy(event.y)
         x1, y1 = self.drag_start_screen
-        self.canvas.create_rectangle(x1, y1, sx, sy, outline="#3498db", width=1,
-                                     dash=(2, 2), tags="selection_rect")
+        self.canvas.create_rectangle(
+            x1, y1, sx, sy, outline="#3498db", width=1, dash=(2, 2), tags="selection_rect"
+        )
 
     def _do_pan(self, event):
         dx = event.x - self.pan_start[0]
@@ -2267,17 +2852,17 @@ class CADEditorFrame(tk.Frame):
         wx2, wy2 = self.cad.screen_to_world(w, h, w, h)
 
         x_start = math.floor(min(wx1, wx2) / gs) * gs
-        x_end   = math.ceil (max(wx1, wx2) / gs) * gs
+        x_end = math.ceil(max(wx1, wx2) / gs) * gs
         y_start = math.floor(min(wy1, wy2) / gs) * gs
-        y_end   = math.ceil (max(wy1, wy2) / gs) * gs
+        y_end = math.ceil(max(wy1, wy2) / gs) * gs
 
-        for x in self._frange(x_start, x_end + gs/2, gs):
+        for x in self._frange(x_start, x_end + gs / 2, gs):
             sx1, sy1 = self.cad.world_to_screen(x, y_start, w, h)
-            sx2, sy2 = self.cad.world_to_screen(x, y_end,   w, h)
+            sx2, sy2 = self.cad.world_to_screen(x, y_end, w, h)
             self.canvas.create_line(sx1, sy1, sx2, sy2, fill="#e0e0e0", tags="grid")
-        for y in self._frange(y_start, y_end + gs/2, gs):
+        for y in self._frange(y_start, y_end + gs / 2, gs):
             sx1, sy1 = self.cad.world_to_screen(x_start, y, w, h)
-            sx2, sy2 = self.cad.world_to_screen(x_end,   y, w, h)
+            sx2, sy2 = self.cad.world_to_screen(x_end, y, w, h)
             self.canvas.create_line(sx1, sy1, sx2, sy2, fill="#e0e0e0", tags="grid")
 
         ox, oy = self.cad.world_to_screen(0, 0, w, h)
@@ -2302,12 +2887,19 @@ class CADEditorFrame(tk.Frame):
             for p in self.temp_points:
                 sx, sy = self.cad.world_to_screen(p.x, p.y, w, h)
                 pts.append((sx, sy))
-                self.canvas.create_oval(sx-3, sy-3, sx+3, sy+3,
-                                        fill=self.colors["accent"], tags="preview")
-            for i in range(len(pts)-1):
-                self.canvas.create_line(pts[i][0], pts[i][1],
-                                        pts[i+1][0], pts[i+1][1],
-                                        fill=self.colors["accent"], width=2, tags="preview")
+                self.canvas.create_oval(
+                    sx - 3, sy - 3, sx + 3, sy + 3, fill=self.colors["accent"], tags="preview"
+                )
+            for i in range(len(pts) - 1):
+                self.canvas.create_line(
+                    pts[i][0],
+                    pts[i][1],
+                    pts[i + 1][0],
+                    pts[i + 1][1],
+                    fill=self.colors["accent"],
+                    width=2,
+                    tags="preview",
+                )
 
         # тимчасові точки дуги (center-start-end)
         if self.current_tool == "arc" and self.temp_points:
@@ -2315,14 +2907,22 @@ class CADEditorFrame(tk.Frame):
             h = self.canvas.winfo_height()
             for p in self.temp_points:
                 sx, sy = self.cad.world_to_screen(p.x, p.y, w, h)
-                self.canvas.create_oval(sx-3, sy-3, sx+3, sy+3,
-                                        fill=self.colors["accent"], tags="preview")
+                self.canvas.create_oval(
+                    sx - 3, sy - 3, sx + 3, sy + 3, fill=self.colors["accent"], tags="preview"
+                )
             if len(self.temp_points) == 2:
                 s0 = self.cad.world_to_screen(self.temp_points[0].x, self.temp_points[0].y, w, h)
                 s1 = self.cad.world_to_screen(self.temp_points[1].x, self.temp_points[1].y, w, h)
-                self.canvas.create_line(s0[0], s0[1], s1[0], s1[1],
-                                        fill=self.colors["accent"], width=2,
-                                        tags="preview", dash=(4, 4))
+                self.canvas.create_line(
+                    s0[0],
+                    s0[1],
+                    s1[0],
+                    s1[1],
+                    fill=self.colors["accent"],
+                    width=2,
+                    tags="preview",
+                    dash=(4, 4),
+                )
 
     def _draw_entity(self, e):
         w = self.canvas.winfo_width()
@@ -2339,23 +2939,37 @@ class CADEditorFrame(tk.Frame):
         if isinstance(e, CADLine):
             sx1, sy1 = self.cad.world_to_screen(e.p1.x, e.p1.y, w, h)
             sx2, sy2 = self.cad.world_to_screen(e.p2.x, e.p2.y, w, h)
-            self.canvas.create_line(sx1, sy1, sx2, sy2, fill=color,
-                                    width=width, tags="entity", dash=dash)
+            self.canvas.create_line(
+                sx1, sy1, sx2, sy2, fill=color, width=width, tags="entity", dash=dash
+            )
 
         elif isinstance(e, CADRectangle):
             sx1, sy1 = self.cad.world_to_screen(e.p1.x, e.p1.y, w, h)
             sx2, sy2 = self.cad.world_to_screen(e.p2.x, e.p2.y, w, h)
-            self.canvas.create_rectangle(min(sx1, sx2), min(sy1, sy2),
-                                         max(sx1, sx2), max(sy1, sy2),
-                                         outline=color, width=width,
-                                         tags="entity", dash=dash)
+            self.canvas.create_rectangle(
+                min(sx1, sx2),
+                min(sy1, sy2),
+                max(sx1, sx2),
+                max(sy1, sy2),
+                outline=color,
+                width=width,
+                tags="entity",
+                dash=dash,
+            )
 
         elif isinstance(e, CADCircle):
             sx, sy = self.cad.world_to_screen(e.center.x, e.center.y, w, h)
             sr = e.radius * self.cad.scale
-            self.canvas.create_oval(sx-sr, sy-sr, sx+sr, sy+sr,
-                                    outline=color, width=width,
-                                    tags="entity", dash=dash)
+            self.canvas.create_oval(
+                sx - sr,
+                sy - sr,
+                sx + sr,
+                sy + sr,
+                outline=color,
+                width=width,
+                tags="entity",
+                dash=dash,
+            )
 
         elif isinstance(e, CADArc):
             sx, sy = self.cad.world_to_screen(e.center.x, e.center.y, w, h)
@@ -2372,18 +2986,19 @@ class CADEditorFrame(tk.Frame):
                 px = sx + sr * math.cos(rad)
                 py = sy - sr * math.sin(rad)
                 pts.extend([px, py])
-            self.canvas.create_line(pts, fill=color, width=width,
-                                    tags="entity", dash=dash)
+            self.canvas.create_line(pts, fill=color, width=width, tags="entity", dash=dash)
 
         elif isinstance(e, CADDimension):
             sx1, sy1 = self.cad.world_to_screen(e.p1.x, e.p1.y, w, h)
             sx2, sy2 = self.cad.world_to_screen(e.p2.x, e.p2.y, w, h)
-            self.canvas.create_line(sx1, sy1, sx2, sy2, fill=color,
-                                    width=width, tags="entity", dash=(4, 2))
+            self.canvas.create_line(
+                sx1, sy1, sx2, sy2, fill=color, width=width, tags="entity", dash=(4, 2)
+            )
             val = e.value()
             mx, my = (sx1 + sx2) / 2, (sy1 + sy2) / 2 - 10
-            self.canvas.create_text(mx, my, text=f"{val:.1f} мм",
-                                    fill=color, font=("Segoe UI", 9), tags="entity")
+            self.canvas.create_text(
+                mx, my, text=f"{val:.1f} мм", fill=color, font=("Segoe UI", 9), tags="entity"
+            )
 
         elif isinstance(e, CADPolyline):
             if len(e.points) < 2:
@@ -2393,18 +3008,25 @@ class CADEditorFrame(tk.Frame):
                 sx, sy = self.cad.world_to_screen(p.x, p.y, w, h)
                 pts.extend([sx, sy])
             if e.closed and len(pts) >= 4:
-                self.canvas.create_polygon(pts, outline=color, fill="",
-                                           width=width, tags="entity", dash=dash)
+                self.canvas.create_polygon(
+                    pts, outline=color, fill="", width=width, tags="entity", dash=dash
+                )
             else:
-                self.canvas.create_line(pts, fill=color, width=width,
-                                        tags="entity", dash=dash)
+                self.canvas.create_line(pts, fill=color, width=width, tags="entity", dash=dash)
 
         elif isinstance(e, CADText):
             sx, sy = self.cad.world_to_screen(e.x, e.y, w, h)
             anchor = {"left": "w", "center": "center", "right": "e"}.get(e.align, "w")
-            self.canvas.create_text(sx, sy, text=e.text, fill=color,
-                                    font=("Segoe UI", int(e.height * self.cad.scale)),
-                                    anchor=anchor, tags="entity", angle=e.angle)
+            self.canvas.create_text(
+                sx,
+                sy,
+                text=e.text,
+                fill=color,
+                font=("Segoe UI", int(e.height * self.cad.scale)),
+                anchor=anchor,
+                tags="entity",
+                angle=e.angle,
+            )
 
         elif isinstance(e, CADHatch):
             if len(e.boundary) < 3:
@@ -2413,22 +3035,22 @@ class CADEditorFrame(tk.Frame):
             for p in e.boundary:
                 sx, sy = self.cad.world_to_screen(p.x, p.y, w, h)
                 pts.extend([sx, sy])
-            self.canvas.create_polygon(pts, outline=color, fill="#f0f0f0",
-                                       width=1, tags="entity", dash=(2, 2))
+            self.canvas.create_polygon(
+                pts, outline=color, fill="#f0f0f0", width=1, tags="entity", dash=(2, 2)
+            )
 
         elif isinstance(e, CADHole):
             sx, sy = self.cad.world_to_screen(e.center.x, e.center.y, w, h)
             sr = e.radius * self.cad.scale
-            self.canvas.create_oval(sx-sr, sy-sr, sx+sr, sy+sr,
-                                    outline=color, width=width, tags="entity")
-            self.canvas.create_line(sx-sr, sy, sx+sr, sy,
-                                    fill=color, width=1, tags="entity")
-            self.canvas.create_line(sx, sy-sr, sx, sy+sr,
-                                    fill=color, width=1, tags="entity")
+            self.canvas.create_oval(
+                sx - sr, sy - sr, sx + sr, sy + sr, outline=color, width=width, tags="entity"
+            )
+            self.canvas.create_line(sx - sr, sy, sx + sr, sy, fill=color, width=1, tags="entity")
+            self.canvas.create_line(sx, sy - sr, sx, sy + sr, fill=color, width=1, tags="entity")
             if e.label:
-                self.canvas.create_text(sx, sy-sr-5, text=e.label,
-                                        fill=color, font=("Segoe UI", 8),
-                                        tags="entity")
+                self.canvas.create_text(
+                    sx, sy - sr - 5, text=e.label, fill=color, font=("Segoe UI", 8), tags="entity"
+                )
 
     # ------------------------------------------------------------------
     # Полілінія, текст, штрихування
@@ -2467,16 +3089,26 @@ class CADEditorFrame(tk.Frame):
 
         btn_frame = tk.Frame(dialog)
         btn_frame.pack(pady=10)
-        tk.Button(btn_frame, text="OK", command=ok, bg=self.colors["accent"],
-                  fg="white", font=("Segoe UI", 9), width=8).pack(side=tk.LEFT, padx=5)
-        tk.Button(btn_frame, text="Скасувати", command=cancel,
-                  font=("Segoe UI", 9), width=8).pack(side=tk.LEFT, padx=5)
+        tk.Button(
+            btn_frame,
+            text="OK",
+            command=ok,
+            bg=self.colors["accent"],
+            fg="white",
+            font=("Segoe UI", 9),
+            width=8,
+        ).pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Скасувати", command=cancel, font=("Segoe UI", 9), width=8).pack(
+            side=tk.LEFT, padx=5
+        )
         dialog.bind("<Return>", lambda e: ok())
         dialog.bind("<Escape>", lambda e: cancel())
 
     def _create_hatch_at(self, p):
         for e in reversed(self.cad.get_visible_entities()):
-            if isinstance(e, (CADPolyline, CADRectangle, CADCircle))                and e.hit_test(p.x, p.y, tol=1):
+            if isinstance(e, CADPolyline | CADRectangle | CADCircle) and e.hit_test(
+                p.x, p.y, tol=1
+            ):
                 boundary = []
                 if isinstance(e, CADPolyline):
                     boundary = [pt.copy() for pt in e.points]
@@ -2485,13 +3117,19 @@ class CADEditorFrame(tk.Frame):
                 elif isinstance(e, CADRectangle):
                     x1, y1 = e.p1.x, e.p1.y
                     x2, y2 = e.p2.x, e.p2.y
-                    boundary = [CADPoint(x1, y1), CADPoint(x2, y1),
-                                CADPoint(x2, y2), CADPoint(x1, y2)]
+                    boundary = [
+                        CADPoint(x1, y1),
+                        CADPoint(x2, y1),
+                        CADPoint(x2, y2),
+                        CADPoint(x1, y2),
+                    ]
                 elif isinstance(e, CADCircle):
                     n = 16
                     boundary = [
-                        CADPoint(e.center.x + e.radius*math.cos(2*math.pi*i/n),
-                                 e.center.y + e.radius*math.sin(2*math.pi*i/n))
+                        CADPoint(
+                            e.center.x + e.radius * math.cos(2 * math.pi * i / n),
+                            e.center.y + e.radius * math.sin(2 * math.pi * i / n),
+                        )
                         for i in range(n)
                     ]
                 if boundary:
@@ -2510,22 +3148,24 @@ class CADEditorFrame(tk.Frame):
         self.prop_text.config(state="normal")
         self.prop_text.delete("1.0", tk.END)
         if not sel:
-            self.prop_text.insert(tk.END,
+            self.prop_text.insert(
+                tk.END,
                 f"Об'єктів: {len(self.cad.entities)}\n"
                 f"Видимих: {len(self.cad.get_visible_entities())}\n"
                 f"Загальна площа: {self.cad.get_total_area():.2f} мм²\n"
-                f"Загальний периметр: {self.cad.get_total_perimeter():.2f} мм\n")
+                f"Загальний периметр: {self.cad.get_total_perimeter():.2f} мм\n",
+            )
         else:
             self.prop_text.insert(tk.END, f"Вибрано: {len(sel)} об'єкт(ів)\n")
             for e in sel:
                 self.prop_text.insert(tk.END, f"\n{type(e).__name__} #{e.id}\n")
                 self.prop_text.insert(tk.END, f"  Шар: {e.layer}\n")
                 self.prop_text.insert(tk.END, f"  Колір: {e.color}\n")
-                if hasattr(e, 'length') and callable(e.length):
+                if hasattr(e, "length") and callable(e.length):
                     self.prop_text.insert(tk.END, f"  Довжина: {e.length():.2f} мм\n")
-                if hasattr(e, 'area') and callable(e.area) and e.area() > 0:
+                if hasattr(e, "area") and callable(e.area) and e.area() > 0:
                     self.prop_text.insert(tk.END, f"  Площа: {e.area():.2f} мм²\n")
-                if hasattr(e, 'perimeter') and callable(e.perimeter) and e.perimeter() > 0:
+                if hasattr(e, "perimeter") and callable(e.perimeter) and e.perimeter() > 0:
                     self.prop_text.insert(tk.END, f"  Периметр: {e.perimeter():.2f} мм\n")
         self.prop_text.config(state="disabled")
 
@@ -2542,9 +3182,7 @@ class CADEditorFrame(tk.Frame):
             val = f"{w:.1f}x{h:.1f}"
         elif tool == "arc":
             val = ""  # arc uses separate preview, not size entry
-        elif tool in ("circle", "hole"):
-            val = f"{math.hypot(p.x - self.drag_start.x, p.y - self.drag_start.y):.1f}"
-        elif tool == "dimension":
+        elif tool in ("circle", "hole") or tool == "dimension":
             val = f"{math.hypot(p.x - self.drag_start.x, p.y - self.drag_start.y):.1f}"
         self.size_entry.config(state="normal")
         self.size_entry.delete(0, tk.END)
@@ -2584,11 +3222,7 @@ class CADEditorFrame(tk.Frame):
             cy = (start.y + end.y) / 2
             val = f"{entity.width():.1f}x{entity.height():.1f}"
             label = "Ш x В (мм):"
-        elif tool == "arc":
-            cx, cy = start.x, start.y
-            val = f"{entity.radius:.1f}"
-            label = "Радіус (мм):"
-        elif tool in ("circle", "hole"):
+        elif tool == "arc" or tool in ("circle", "hole"):
             cx, cy = start.x, start.y
             val = f"{entity.radius:.1f}"
             label = "Радіус (мм):"
@@ -2615,11 +3249,13 @@ class CADEditorFrame(tk.Frame):
         frame = tk.Frame(dialog, bg="#fff3cd", padx=12, pady=10)
         frame.pack()
 
-        tk.Label(frame, text=label, bg="#fff3cd", fg="#856404",
-                 font=("Segoe UI", 10, "bold")).pack()
+        tk.Label(
+            frame, text=label, bg="#fff3cd", fg="#856404", font=("Segoe UI", 10, "bold")
+        ).pack()
 
-        entry = tk.Entry(frame, width=14, font=("Segoe UI", 11), justify="center",
-                         relief=tk.SOLID, bd=1)
+        entry = tk.Entry(
+            frame, width=14, font=("Segoe UI", 11), justify="center", relief=tk.SOLID, bd=1
+        )
         entry.insert(0, val)
         entry.pack(pady=(6, 8))
         entry.select_range(0, tk.END)
@@ -2642,10 +3278,18 @@ class CADEditorFrame(tk.Frame):
         def cancel():
             dialog.destroy()
 
-        tk.Button(btn_frame, text="OK  ↵", command=apply, bg="#27ae60", fg="white",
-                  font=("Segoe UI", 9, "bold"), width=8).pack(side=tk.LEFT, padx=3)
-        tk.Button(btn_frame, text="Скасувати  Esc", command=cancel,
-                  font=("Segoe UI", 9), width=12).pack(side=tk.LEFT, padx=3)
+        tk.Button(
+            btn_frame,
+            text="OK  ↵",
+            command=apply,
+            bg="#27ae60",
+            fg="white",
+            font=("Segoe UI", 9, "bold"),
+            width=8,
+        ).pack(side=tk.LEFT, padx=3)
+        tk.Button(
+            btn_frame, text="Скасувати  Esc", command=cancel, font=("Segoe UI", 9), width=12
+        ).pack(side=tk.LEFT, padx=3)
 
         dialog.bind("<Return>", lambda e: apply())
         dialog.bind("<Escape>", lambda e: cancel())
@@ -2667,8 +3311,7 @@ class CADEditorFrame(tk.Frame):
         new_entity = None
         if tool == "line":
             dist = float(txt)
-            new_end = CADPoint(start.x + dist * math.cos(angle),
-                               start.y + dist * math.sin(angle))
+            new_end = CADPoint(start.x + dist * math.cos(angle), start.y + dist * math.sin(angle))
             new_entity = CADLine(start, new_end)
             self.status_label.config(text=f"Лінію оновлено ({dist:.1f} мм)")
         elif tool == "rectangle":
@@ -2696,8 +3339,7 @@ class CADEditorFrame(tk.Frame):
                 self.status_label.config(text=f"Дугу оновлено (R={r:.1f} мм)")
         elif tool == "dimension":
             dist = float(txt)
-            new_end = CADPoint(start.x + dist * math.cos(angle),
-                               start.y + dist * math.sin(angle))
+            new_end = CADPoint(start.x + dist * math.cos(angle), start.y + dist * math.sin(angle))
             new_entity = CADDimension(start, new_end)
             self.status_label.config(text=f"Розмір оновлено ({dist:.1f} мм)")
         elif tool == "hole":
@@ -2714,7 +3356,12 @@ class CADEditorFrame(tk.Frame):
     def _finish_shape(self, p):
         """Завершити креслення поточної фігури точкою p, потім показати діалог розміру"""
         if not self.drawing or not self.drag_start:
-            print("[DEBUG] _finish_shape early return: drawing=", self.drawing, "drag_start=", self.drag_start)
+            print(
+                "[DEBUG] _finish_shape early return: drawing=",
+                self.drawing,
+                "drag_start=",
+                self.drag_start,
+            )
             return
         tool = self.current_tool
         start = self.drag_start
@@ -2791,8 +3438,7 @@ class CADEditorFrame(tk.Frame):
 
             if tool == "line":
                 dist = float(txt)
-                end = CADPoint(start.x + dist * math.cos(angle),
-                               start.y + dist * math.sin(angle))
+                end = CADPoint(start.x + dist * math.cos(angle), start.y + dist * math.sin(angle))
                 self.cad.add_entity(CADLine(start, end))
                 self.status_label.config(text=f"Лінію додано ({dist:.1f} мм)")
 
@@ -2825,8 +3471,7 @@ class CADEditorFrame(tk.Frame):
 
             elif tool == "dimension":
                 dist = float(txt)
-                end = CADPoint(start.x + dist * math.cos(angle),
-                               start.y + dist * math.sin(angle))
+                end = CADPoint(start.x + dist * math.cos(angle), start.y + dist * math.sin(angle))
                 self.cad.add_entity(CADDimension(start, end))
                 self.status_label.config(text=f"Розмір додано ({dist:.1f} мм)")
 
@@ -2860,8 +3505,9 @@ class CADEditorFrame(tk.Frame):
     # Файли
     # ------------------------------------------------------------------
     def save_drawing(self):
-        path = filedialog.asksaveasfilename(defaultextension=".json",
-                                            filetypes=[("JSON", "*.json")])
+        path = filedialog.asksaveasfilename(
+            defaultextension=".json", filetypes=[("JSON", "*.json")]
+        )
         if path:
             self.cad.save_json(path)
             self.status_label.config(text=f"Збережено: {path}")
@@ -2875,23 +3521,19 @@ class CADEditorFrame(tk.Frame):
             self.status_label.config(text=f"Завантажено: {path}")
 
     def export_svg(self):
-        path = filedialog.asksaveasfilename(defaultextension=".svg",
-                                            filetypes=[("SVG", "*.svg")])
+        path = filedialog.asksaveasfilename(defaultextension=".svg", filetypes=[("SVG", "*.svg")])
         if path:
-            self.cad.export_svg(path, self.canvas.winfo_width(),
-                                self.canvas.winfo_height())
+            self.cad.export_svg(path, self.canvas.winfo_width(), self.canvas.winfo_height())
             self.status_label.config(text=f"Експортовано SVG: {path}")
 
     def export_dxf(self):
-        path = filedialog.asksaveasfilename(defaultextension=".dxf",
-                                            filetypes=[("DXF", "*.dxf")])
+        path = filedialog.asksaveasfilename(defaultextension=".dxf", filetypes=[("DXF", "*.dxf")])
         if path:
             self.cad.export_dxf(path)
             self.status_label.config(text=f"Експортовано DXF: {path}")
 
     def clear_drawing(self):
-        if messagebox.askyesno("Очистити",
-                               "Ви впевнені, що хочете очистити креслення?"):
+        if messagebox.askyesno("Очистити", "Ви впевнені, що хочете очистити креслення?"):
             self.cad.clear()
             self.redraw()
             self.update_properties()

@@ -1,6 +1,7 @@
 """
 Модуль ціноутворення
 """
+
 from ventilation_company.config import MARKUP_PERCENTAGE, VAT_RATE
 
 
@@ -25,7 +26,7 @@ class PricingEngine:
             "vat_amount": round(vat_amount, 2),
             "final_price": round(final_price, 2),
             "profit": round(profit, 2),
-            "profit_margin": round((profit / final_price) * 100, 2) if final_price > 0 else 0
+            "profit_margin": round((profit / final_price) * 100, 2) if final_price > 0 else 0,
         }
 
     def competitive_pricing(self, competitor_price, target_margin_percent=20):
@@ -48,7 +49,7 @@ class PricingEngine:
             "final_price": round(final_price, 2),
             "profit": round(profit, 2),
             "profit_margin": round((profit / recommended_price) * 100, 2),
-            "warning": warning
+            "warning": warning,
         }
 
     def value_based_pricing(self, client_value, value_share_percent=30):
@@ -71,7 +72,7 @@ class PricingEngine:
             "final_price": round(final_price, 2),
             "profit": round(profit, 2),
             "profit_margin": round((profit / price_without_vat) * 100, 2),
-            "warning": warning
+            "warning": warning,
         }
 
     def compare_methods(self, competitor_price=None, client_value=None):

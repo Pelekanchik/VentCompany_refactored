@@ -1,9 +1,12 @@
 """
 Модуль роботи з базою даних SQLite
 """
-import sqlite3
+
+import json
 import os
-from datetime import datetime
+import sqlite3
+from math import pi
+
 from ventilation_company.config import DB_PATH
 
 
@@ -13,7 +16,8 @@ def init_database():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS projects (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_number TEXT UNIQUE NOT NULL,
@@ -29,9 +33,11 @@ def init_database():
             total_area REAL DEFAULT 0,
             notes TEXT
         )
-    """)
+    """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS project_components (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER,
@@ -42,9 +48,11 @@ def init_database():
             total_price REAL,
             FOREIGN KEY (project_id) REFERENCES projects(id)
         )
-    """)
+    """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS project_materials (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER,
@@ -55,9 +63,11 @@ def init_database():
             total_price REAL,
             FOREIGN KEY (project_id) REFERENCES projects(id)
         )
-    """)
+    """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS project_works (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER,
@@ -68,9 +78,11 @@ def init_database():
             total_price REAL,
             FOREIGN KEY (project_id) REFERENCES projects(id)
         )
-    """)
+    """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS calculations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER,
@@ -87,9 +99,11 @@ def init_database():
             calculated_at TEXT,
             FOREIGN KEY (project_id) REFERENCES projects(id)
         )
-    """)
+    """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS employees (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             full_name TEXT NOT NULL,
@@ -100,9 +114,11 @@ def init_database():
             hired_date TEXT,
             status TEXT DEFAULT 'active'
         )
-    """)
+    """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS payroll (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             year INTEGER,
@@ -115,9 +131,11 @@ def init_database():
             net_salary REAL,
             FOREIGN KEY (employee_id) REFERENCES employees(id)
         )
-    """)
+    """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS production (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER,
@@ -130,9 +148,11 @@ def init_database():
             notes TEXT,
             FOREIGN KEY (project_id) REFERENCES projects(id)
         )
-    """)
+    """
+    )
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS archive (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             archive_name TEXT,
@@ -143,10 +163,12 @@ def init_database():
             archive_type TEXT,
             FOREIGN KEY (project_id) REFERENCES projects(id)
         )
-    """)
-    
-        # ========== ТАБЛИЦЯ КРЕСЛЕНЬ ПРОЕКТУ ==========
-    cursor.execute("""
+    """
+    )
+
+    # ========== ТАБЛИЦЯ КРЕСЛЕНЬ ПРОЕКТУ ==========
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS project_drawings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             project_id INTEGER NOT NULL,
@@ -155,11 +177,15 @@ def init_database():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (project_id) REFERENCES projects(id)
         )
-    """)
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_drawings_project ON project_drawings(project_id)")
+    """
+    )
+    cursor.execute(
+        "CREATE INDEX IF NOT EXISTS idx_drawings_project ON project_drawings(project_id)"
+    )
 
     # ========== ТАБЛИЦІ КАЛЬКУЛЯТОРА ВИРОБІВ ==========
-    cursor.executescript("""
+    cursor.executescript(
+        """
         CREATE TABLE IF NOT EXISTS product_types (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -262,116 +288,425 @@ def init_database():
             key TEXT PRIMARY KEY,
             value TEXT
         );
-    """)
+    """
+    )
 
     # Заповнення демо-даних калькулятора (тільки якщо таблиці порожні)
     cursor.execute("SELECT COUNT(*) FROM product_types")
     if cursor.fetchone()[0] == 0:
-        cursor.executemany("INSERT INTO product_types (name, slug, icon, sort_order) VALUES (?,?,?,?)", [
-            ("Повітропроводи", "ducts", "🔧", 1),
-            ("Фасонні вироби", "fittings", "🔩", 2),
-            ("Решітки та дифузори", "grilles", "⬜", 3),
-            ("Заслінки та клапани", "dampers", "🔲", 4),
-        ])
+        cursor.executemany(
+            "INSERT INTO product_types (name, slug, icon, sort_order) VALUES (?,?,?,?)",
+            [
+                ("Повітропроводи", "ducts", "🔧", 1),
+                ("Фасонні вироби", "fittings", "🔩", 2),
+                ("Решітки та дифузори", "grilles", "⬜", 3),
+                ("Заслінки та клапани", "dampers", "🔲", 4),
+            ],
+        )
 
     cursor.execute("SELECT COUNT(*) FROM product_subtypes")
     if cursor.fetchone()[0] == 0:
-        import json
-        cursor.executemany("""
+
+        cursor.executemany(
+            """
             INSERT INTO product_subtypes (product_type_id, name, slug, formula, shape_type, flange_perimeter_formula, waste_factor, labor_norm, description)
             VALUES (?,?,?,?,?,?,?,?,?)
-        """, [
-            (1, "Круглі повітропроводи", "round_duct", "pi * (diameter/1000 + 2*0.003) * (length/1000)", "round", None, 1.18, 0.35, "Круглого перерізу з фальцевим з'єднанням"),
-            (1, "Прямокутні повітропроводи", "rect_duct", "2 * (width/1000 + height/1000 + 2*0.003) * (length/1000)", "rect", "2 * (width/1000 + height/1000)", 1.20, 0.45, "Прямокутного перерізу"),
-            (2, "Відведення (коліно)", "elbow", "pi * (diameter/1000 + 2*0.003) * (diameter/1000) * 1.35", "round", None, 1.25, 0.60, "Кругле відведення"),
-            (2, "Трійник", "tee", "pi * (diameter/1000 + 2*0.003) * (diameter/1000) * 1.55", "round", None, 1.28, 0.90, "Круглий трійник"),
-            (2, "Перехід", "transition", "pi * ((d1/1000 + d2/1000)/2 + 2*0.003) * (length/1000) * 1.25", "round", None, 1.25, 0.70, "Перехід діаметра"),
-            (2, "Заглушка", "cap", "pi * (diameter/1000 + 2*0.003) * (diameter/1000) * 0.8", "round", None, 1.22, 0.30, "Заглушка кругла"),
-            (2, "Прямокутне відведення", "rect_elbow", "2 * (width/1000 + height/1000 + 2*0.003) * ((width/1000 + height/1000)/2) * 1.35", "rect", "2 * (width/1000 + height/1000)", 1.25, 0.65, "Прямокутне коліно"),
-            (2, "Прямокутний трійник", "rect_tee", "2 * (width/1000 + height/1000 + 2*0.003) * ((width/1000 + height/1000)/2) * 1.65", "rect", "2 * (width/1000 + height/1000)", 1.28, 0.95, "Прямокутний трійник"),
-            (2, "Прямокутний перехід", "rect_transition", "2 * ((width/1000 + height/1000 + width2/1000 + height2/1000)/2 + 2*0.003) * (length/1000) * 1.3", "rect", "2 * (width/1000 + height/1000)", 1.25, 0.75, "Перехід прямокутного перерізу"),
-            (2, "Прямокутна заглушка", "rect_cap", "2 * (width/1000 + height/1000 + 2*0.003) * ((width/1000 + height/1000)/2) * 0.75", "rect", "2 * (width/1000 + height/1000)", 1.22, 0.35, "Заглушка прямокутна"),
-            (3, "Решітка вентиляційна", "grille", "(width/1000) * (height/1000) * 2.5", "rect", None, 1.15, 0.40, "Решітка з ламелями"),
-            (4, "Заслінка повітряна", "damper", "pi * (diameter/1000 + 2*0.003) * (diameter/1000) * 1.8", "round", None, 1.25, 0.55, "Ручна заслінка"),
-        ])
+        """,
+            [
+                (
+                    1,
+                    "Круглі повітропроводи",
+                    "round_duct",
+                    "pi * (diameter/1000 + 2*0.003) * (length/1000)",
+                    "round",
+                    None,
+                    1.18,
+                    0.35,
+                    "Круглого перерізу з фальцевим з'єднанням",
+                ),
+                (
+                    1,
+                    "Прямокутні повітропроводи",
+                    "rect_duct",
+                    "2 * (width/1000 + height/1000 + 2*0.003) * (length/1000)",
+                    "rect",
+                    "2 * (width/1000 + height/1000)",
+                    1.20,
+                    0.45,
+                    "Прямокутного перерізу",
+                ),
+                (
+                    2,
+                    "Відведення (коліно)",
+                    "elbow",
+                    "pi * (diameter/1000 + 2*0.003) * (diameter/1000) * 1.35",
+                    "round",
+                    None,
+                    1.25,
+                    0.60,
+                    "Кругле відведення",
+                ),
+                (
+                    2,
+                    "Трійник",
+                    "tee",
+                    "pi * (diameter/1000 + 2*0.003) * (diameter/1000) * 1.55",
+                    "round",
+                    None,
+                    1.28,
+                    0.90,
+                    "Круглий трійник",
+                ),
+                (
+                    2,
+                    "Перехід",
+                    "transition",
+                    "pi * ((d1/1000 + d2/1000)/2 + 2*0.003) * (length/1000) * 1.25",
+                    "round",
+                    None,
+                    1.25,
+                    0.70,
+                    "Перехід діаметра",
+                ),
+                (
+                    2,
+                    "Заглушка",
+                    "cap",
+                    "pi * (diameter/1000 + 2*0.003) * (diameter/1000) * 0.8",
+                    "round",
+                    None,
+                    1.22,
+                    0.30,
+                    "Заглушка кругла",
+                ),
+                (
+                    2,
+                    "Прямокутне відведення",
+                    "rect_elbow",
+                    "2 * (width/1000 + height/1000 + 2*0.003) * ((width/1000 + height/1000)/2) * 1.35",
+                    "rect",
+                    "2 * (width/1000 + height/1000)",
+                    1.25,
+                    0.65,
+                    "Прямокутне коліно",
+                ),
+                (
+                    2,
+                    "Прямокутний трійник",
+                    "rect_tee",
+                    "2 * (width/1000 + height/1000 + 2*0.003) * ((width/1000 + height/1000)/2) * 1.65",
+                    "rect",
+                    "2 * (width/1000 + height/1000)",
+                    1.28,
+                    0.95,
+                    "Прямокутний трійник",
+                ),
+                (
+                    2,
+                    "Прямокутний перехід",
+                    "rect_transition",
+                    "2 * ((width/1000 + height/1000 + width2/1000 + height2/1000)/2 + 2*0.003) * (length/1000) * 1.3",
+                    "rect",
+                    "2 * (width/1000 + height/1000)",
+                    1.25,
+                    0.75,
+                    "Перехід прямокутного перерізу",
+                ),
+                (
+                    2,
+                    "Прямокутна заглушка",
+                    "rect_cap",
+                    "2 * (width/1000 + height/1000 + 2*0.003) * ((width/1000 + height/1000)/2) * 0.75",
+                    "rect",
+                    "2 * (width/1000 + height/1000)",
+                    1.22,
+                    0.35,
+                    "Заглушка прямокутна",
+                ),
+                (
+                    3,
+                    "Решітка вентиляційна",
+                    "grille",
+                    "(width/1000) * (height/1000) * 2.5",
+                    "rect",
+                    None,
+                    1.15,
+                    0.40,
+                    "Решітка з ламелями",
+                ),
+                (
+                    4,
+                    "Заслінка повітряна",
+                    "damper",
+                    "pi * (diameter/1000 + 2*0.003) * (diameter/1000) * 1.8",
+                    "round",
+                    None,
+                    1.25,
+                    0.55,
+                    "Ручна заслінка",
+                ),
+            ],
+        )
 
     cursor.execute("SELECT COUNT(*) FROM size_ranges")
     if cursor.fetchone()[0] == 0:
-        import json
-        cursor.executemany("""
+
+        cursor.executemany(
+            """
             INSERT INTO size_ranges (subtype_id, param_name, param_label, min_value, max_value, step, unit, values_json)
             VALUES (?,?,?,?,?,?,?,?)
-        """, [
-            (1, "diameter", "Діаметр", 80, 1000, 10, "мм", json.dumps([80,100,125,160,200,250,315,400,500,630,800,1000])),
-            (1, "length", "Довжина", 100, 3000, 50, "мм", None),
-            (2, "width", "Ширина", 100, 1000, 50, "мм", json.dumps([100,150,200,250,300,400,500,600,800])),
-            (2, "height", "Висота", 50, 500, 50, "мм", json.dumps([50,100,150,200,250,300,400])),
-            (2, "length", "Довжина", 100, 3000, 50, "мм", None),
-            (3, "diameter", "Діаметр", 80, 1000, 10, "мм", json.dumps([100,125,160,200,250,315,400,500])),
-            (3, "angle", "Кут", 30, 90, 15, "°", json.dumps([30,45,60,90])),
-            (4, "diameter", "Діаметр", 100, 500, 10, "мм", json.dumps([100,125,160,200,250,315])),
-            (5, "d1", "Вхідний діаметр", 100, 500, 10, "мм", json.dumps([160,200,250,315])),
-            (5, "d2", "Вихідний діаметр", 80, 400, 10, "мм", json.dumps([100,125,160,200])),
-            (5, "length", "Довжина", 100, 500, 50, "мм", None),
-            (7, "width", "Ширина", 100, 600, 50, "мм", json.dumps([150,200,300,400,500,600])),
-            (7, "height", "Висота", 100, 600, 50, "мм", json.dumps([150,200,300,400,500,600])),
-            (8, "diameter", "Діаметр", 100, 500, 10, "мм", json.dumps([100,125,160,200,250,315])),
-            (9, "width", "Ширина", 100, 1000, 50, "мм", json.dumps([100,150,200,250,300,400,500,600,800])),
-            (9, "height", "Висота", 50, 500, 50, "мм", json.dumps([50,100,150,200,250,300,400])),
-            (9, "angle", "Кут", 30, 90, 15, "°", json.dumps([30,45,60,90])),
-            (10, "width", "Ширина", 100, 1000, 50, "мм", json.dumps([100,150,200,250,300,400,500,600,800])),
-            (10, "height", "Висота", 50, 500, 50, "мм", json.dumps([50,100,150,200,250,300,400])),
-            (11, "width", "Вхідна ширина", 100, 1000, 50, "мм", json.dumps([200,250,300,400,500,600,800])),
-            (11, "height", "Вхідна висота", 50, 500, 50, "мм", json.dumps([100,150,200,250,300,400])),
-            (11, "width2", "Вихідна ширина", 100, 800, 50, "мм", json.dumps([100,150,200,250,300,400,500,600])),
-            (11, "height2", "Вихідна висота", 50, 400, 50, "мм", json.dumps([50,100,150,200,250,300])),
-            (11, "length", "Довжина", 100, 500, 50, "мм", None),
-            (12, "width", "Ширина", 100, 1000, 50, "мм", json.dumps([100,150,200,250,300,400,500,600,800])),
-            (12, "height", "Висота", 50, 500, 50, "мм", json.dumps([50,100,150,200,250,300,400])),
-        ])
+        """,
+            [
+                (
+                    1,
+                    "diameter",
+                    "Діаметр",
+                    80,
+                    1000,
+                    10,
+                    "мм",
+                    json.dumps([80, 100, 125, 160, 200, 250, 315, 400, 500, 630, 800, 1000]),
+                ),
+                (1, "length", "Довжина", 100, 3000, 50, "мм", None),
+                (
+                    2,
+                    "width",
+                    "Ширина",
+                    100,
+                    1000,
+                    50,
+                    "мм",
+                    json.dumps([100, 150, 200, 250, 300, 400, 500, 600, 800]),
+                ),
+                (
+                    2,
+                    "height",
+                    "Висота",
+                    50,
+                    500,
+                    50,
+                    "мм",
+                    json.dumps([50, 100, 150, 200, 250, 300, 400]),
+                ),
+                (2, "length", "Довжина", 100, 3000, 50, "мм", None),
+                (
+                    3,
+                    "diameter",
+                    "Діаметр",
+                    80,
+                    1000,
+                    10,
+                    "мм",
+                    json.dumps([100, 125, 160, 200, 250, 315, 400, 500]),
+                ),
+                (3, "angle", "Кут", 30, 90, 15, "°", json.dumps([30, 45, 60, 90])),
+                (
+                    4,
+                    "diameter",
+                    "Діаметр",
+                    100,
+                    500,
+                    10,
+                    "мм",
+                    json.dumps([100, 125, 160, 200, 250, 315]),
+                ),
+                (5, "d1", "Вхідний діаметр", 100, 500, 10, "мм", json.dumps([160, 200, 250, 315])),
+                (5, "d2", "Вихідний діаметр", 80, 400, 10, "мм", json.dumps([100, 125, 160, 200])),
+                (5, "length", "Довжина", 100, 500, 50, "мм", None),
+                (
+                    7,
+                    "width",
+                    "Ширина",
+                    100,
+                    600,
+                    50,
+                    "мм",
+                    json.dumps([150, 200, 300, 400, 500, 600]),
+                ),
+                (
+                    7,
+                    "height",
+                    "Висота",
+                    100,
+                    600,
+                    50,
+                    "мм",
+                    json.dumps([150, 200, 300, 400, 500, 600]),
+                ),
+                (
+                    8,
+                    "diameter",
+                    "Діаметр",
+                    100,
+                    500,
+                    10,
+                    "мм",
+                    json.dumps([100, 125, 160, 200, 250, 315]),
+                ),
+                (
+                    9,
+                    "width",
+                    "Ширина",
+                    100,
+                    1000,
+                    50,
+                    "мм",
+                    json.dumps([100, 150, 200, 250, 300, 400, 500, 600, 800]),
+                ),
+                (
+                    9,
+                    "height",
+                    "Висота",
+                    50,
+                    500,
+                    50,
+                    "мм",
+                    json.dumps([50, 100, 150, 200, 250, 300, 400]),
+                ),
+                (9, "angle", "Кут", 30, 90, 15, "°", json.dumps([30, 45, 60, 90])),
+                (
+                    10,
+                    "width",
+                    "Ширина",
+                    100,
+                    1000,
+                    50,
+                    "мм",
+                    json.dumps([100, 150, 200, 250, 300, 400, 500, 600, 800]),
+                ),
+                (
+                    10,
+                    "height",
+                    "Висота",
+                    50,
+                    500,
+                    50,
+                    "мм",
+                    json.dumps([50, 100, 150, 200, 250, 300, 400]),
+                ),
+                (
+                    11,
+                    "width",
+                    "Вхідна ширина",
+                    100,
+                    1000,
+                    50,
+                    "мм",
+                    json.dumps([200, 250, 300, 400, 500, 600, 800]),
+                ),
+                (
+                    11,
+                    "height",
+                    "Вхідна висота",
+                    50,
+                    500,
+                    50,
+                    "мм",
+                    json.dumps([100, 150, 200, 250, 300, 400]),
+                ),
+                (
+                    11,
+                    "width2",
+                    "Вихідна ширина",
+                    100,
+                    800,
+                    50,
+                    "мм",
+                    json.dumps([100, 150, 200, 250, 300, 400, 500, 600]),
+                ),
+                (
+                    11,
+                    "height2",
+                    "Вихідна висота",
+                    50,
+                    400,
+                    50,
+                    "мм",
+                    json.dumps([50, 100, 150, 200, 250, 300]),
+                ),
+                (11, "length", "Довжина", 100, 500, 50, "мм", None),
+                (
+                    12,
+                    "width",
+                    "Ширина",
+                    100,
+                    1000,
+                    50,
+                    "мм",
+                    json.dumps([100, 150, 200, 250, 300, 400, 500, 600, 800]),
+                ),
+                (
+                    12,
+                    "height",
+                    "Висота",
+                    50,
+                    500,
+                    50,
+                    "мм",
+                    json.dumps([50, 100, 150, 200, 250, 300, 400]),
+                ),
+            ],
+        )
 
     cursor.execute("SELECT COUNT(*) FROM calc_materials")
     if cursor.fetchone()[0] == 0:
-        cursor.executemany("""
+        cursor.executemany(
+            """
             INSERT INTO calc_materials (name, grade, thickness, price_per_m2, waste_factor)
             VALUES (?,?,?,?,?)
-        """, [
-            ("Оцинкована сталь", "DX51D+Z", 0.5, 420, 1.18),
-            ("Оцинкована сталь", "DX51D+Z", 0.7, 580, 1.18),
-            ("Оцинкована сталь", "DX51D+Z", 1.0, 790, 1.22),
-            ("Нержавіюча сталь", "AISI 304", 0.8, 1450, 1.25),
-            ("Нержавіюча сталь", "AISI 304", 1.0, 1800, 1.25),
-            ("Нержавіюча сталь", "AISI 430", 0.8, 950, 1.25),
-            ("Алюміній", "АД0", 0.8, 1100, 1.22),
-            ("Алюміній", "АД0", 1.0, 1350, 1.22),
-            ("Чорний метал", "08пс", 1.5, 680, 1.20),
-            ("Чорний метал", "08пс", 2.0, 890, 1.20),
-            ("Чорний метал", "08пс", 3.0, 1250, 1.20),
-        ])
+        """,
+            [
+                ("Оцинкована сталь", "DX51D+Z", 0.5, 420, 1.18),
+                ("Оцинкована сталь", "DX51D+Z", 0.7, 580, 1.18),
+                ("Оцинкована сталь", "DX51D+Z", 1.0, 790, 1.22),
+                ("Нержавіюча сталь", "AISI 304", 0.8, 1450, 1.25),
+                ("Нержавіюча сталь", "AISI 304", 1.0, 1800, 1.25),
+                ("Нержавіюча сталь", "AISI 430", 0.8, 950, 1.25),
+                ("Алюміній", "АД0", 0.8, 1100, 1.22),
+                ("Алюміній", "АД0", 1.0, 1350, 1.22),
+                ("Чорний метал", "08пс", 1.5, 680, 1.20),
+                ("Чорний метал", "08пс", 2.0, 890, 1.20),
+                ("Чорний метал", "08пс", 3.0, 1250, 1.20),
+            ],
+        )
 
     cursor.execute("SELECT COUNT(*) FROM subtype_materials")
     if cursor.fetchone()[0] == 0:
         for sid in range(1, 13):
             for mid in range(1, 12):
-                is_def = 1 if (sid in [1,2] and mid == 1) or (sid == 3 and mid == 1) else 0
-                cursor.execute("INSERT INTO subtype_materials (subtype_id, material_id, is_default) VALUES (?,?,?)", (sid, mid, is_def))
+                is_def = 1 if (sid in [1, 2] and mid == 1) or (sid == 3 and mid == 1) else 0
+                cursor.execute(
+                    "INSERT INTO subtype_materials (subtype_id, material_id, is_default) VALUES (?,?,?)",
+                    (sid, mid, is_def),
+                )
 
     cursor.execute("SELECT COUNT(*) FROM calc_settings")
     if cursor.fetchone()[0] == 0:
-        cursor.execute("INSERT INTO calc_settings (key, value) VALUES (?,?)", ("monthly_products", "100"))
-        cursor.execute("INSERT INTO calc_settings (key, value) VALUES (?,?)", ("flange_profile_price", "45"))
-        cursor.execute("INSERT INTO calc_settings (key, value) VALUES (?,?)", ("flange_corner_price", "35"))
-        cursor.execute("INSERT INTO calc_settings (key, value) VALUES (?,?)", ("flange_waste_factor", "1.15"))
+        cursor.execute(
+            "INSERT INTO calc_settings (key, value) VALUES (?,?)", ("monthly_products", "100")
+        )
+        cursor.execute(
+            "INSERT INTO calc_settings (key, value) VALUES (?,?)", ("flange_profile_price", "45")
+        )
+        cursor.execute(
+            "INSERT INTO calc_settings (key, value) VALUES (?,?)", ("flange_corner_price", "35")
+        )
+        cursor.execute(
+            "INSERT INTO calc_settings (key, value) VALUES (?,?)", ("flange_waste_factor", "1.15")
+        )
 
     cursor.execute("SELECT COUNT(*) FROM overhead_items")
     if cursor.fetchone()[0] == 0:
-        cursor.executemany("INSERT INTO overhead_items (name, type, value) VALUES (?,?,?)", [
-            ("Оренда цеху", "fixed", 5000),
-            ("Електроенергія", "percent", 8),
-            ("Амортизація обладнання", "percent", 5),
-            ("Інструменти та витратники", "percent", 3),
-            ("Транспорт", "percent", 2),
-        ])
+        cursor.executemany(
+            "INSERT INTO overhead_items (name, type, value) VALUES (?,?,?)",
+            [
+                ("Оренда цеху", "fixed", 5000),
+                ("Електроенергія", "percent", 8),
+                ("Амортизація обладнання", "percent", 5),
+                ("Інструменти та витратники", "percent", 3),
+                ("Транспорт", "percent", 2),
+            ],
+        )
 
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.commit()
@@ -403,8 +738,6 @@ def execute_query(query, params=(), fetch_one=False):
 
 
 # ========== ДОПОМІЖНІ ФУНКЦІЇ КАЛЬКУЛЯТОРА ==========
-from math import pi
-import json
 
 
 def get_calc_db():
@@ -428,8 +761,7 @@ def calculate_area(formula: str, params: dict, waste_factor: float) -> float:
 def get_size_labels(subtype_id):
     db = get_calc_db()
     rows = db.execute(
-        "SELECT param_name, param_label FROM size_ranges WHERE subtype_id=?",
-        (subtype_id,)
+        "SELECT param_name, param_label FROM size_ranges WHERE subtype_id=?", (subtype_id,)
     ).fetchall()
     db.close()
     return {r["param_name"]: r["param_label"] for r in rows}
