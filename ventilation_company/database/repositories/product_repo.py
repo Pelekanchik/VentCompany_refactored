@@ -2,6 +2,7 @@
 
 from sqlalchemy.orm import Session
 
+from ventilation_company.database.db import SessionLocal
 from ventilation_company.database.models.product import ProductSubtype, ProductType, SizeRange
 
 
@@ -14,6 +15,9 @@ class ProductRepository:
     # ── product_types ──
     def get_all_types(self) -> list[ProductType]:
         return self.db.query(ProductType).order_by(ProductType.sort_order).all()
+
+    def get_all_subtypes(self) -> list[ProductSubtype]:
+        return self.db.query(ProductSubtype).order_by(ProductSubtype.name).all()
 
     def get_type_by_id(self, type_id: int) -> ProductType | None:
         return self.db.query(ProductType).filter(ProductType.id == type_id).first()
@@ -133,3 +137,14 @@ class ProductRepository:
         self.db.delete(sr)
         self.db.commit()
         return True
+
+    def delete_size(self, size_id: int) -> bool:
+        """Alias for delete_size_range."""
+        return self.delete_size_range(size_id)
+
+
+# Зворотна сумісність
+ProductRepo = ProductRepository
+
+
+ProductRepo = ProductRepository(SessionLocal())

@@ -2,6 +2,7 @@
 
 from sqlalchemy.orm import Session
 
+from ventilation_company.database.db import SessionLocal
 from ventilation_company.database.models.calc import CalcCalculation, CalcItem
 
 
@@ -98,3 +99,9 @@ class CalculationRepository:
         self.db.delete(item)
         self.db.commit()
         return True
+
+
+# Зворотна сумісність
+CalcRepo = CalculationRepository
+
+CalcRepo = CalculationRepository(SessionLocal())

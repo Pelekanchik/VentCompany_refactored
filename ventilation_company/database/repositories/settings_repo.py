@@ -2,6 +2,7 @@
 
 from sqlalchemy.orm import Session
 
+from ventilation_company.database.db import SessionLocal
 from ventilation_company.database.models.calc import CalcSetting
 
 
@@ -44,3 +45,18 @@ class SettingsRepository:
         self.db.delete(setting)
         self.db.commit()
         return True
+
+    def get(self, key: str, default: str | None = None) -> str | None:
+        """Alias for get_value."""
+        return self.get_value(key, default)
+
+        # Зворотна сумісність — аліаси для старих методів
+
+    set = set_value
+
+
+# Зворотна сумісність
+SettingsRepo = SettingsRepository
+
+
+SettingsRepo = SettingsRepository(SessionLocal())

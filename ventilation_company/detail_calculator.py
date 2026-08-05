@@ -154,11 +154,12 @@ class DetailCalculatorFrame(tk.Frame):
             ("calc_labor_mode", "hour"),
         ]
         for key, val in defaults:
-            SettingsRepo.set(key, val)
+            SettingsRepo.set_value(key, val)
 
     def load_calc_settings(self):
         """Завантажує збережені налаштування калькулятора."""
-        settings = {k: v for k, v in SettingsRepo.get_all().items() if k.startswith("calc_")}
+        all_settings = SettingsRepo.get_all()
+        settings = {s.key: s.value for s in all_settings if s.key.startswith("calc_")}
 
         # Спочатку режим (щоб on_labor_mode_change не перезаписала ставку)
         if "calc_labor_mode" in settings:
@@ -192,6 +193,24 @@ class DetailCalculatorFrame(tk.Frame):
         SettingsRepo.set("calc_labor_rate", labor)
         SettingsRepo.set("calc_labor_mode", mode)
         messagebox.showinfo("Готово", "Налаштування калькулятора збережено!")
+
+    def _settings(self):
+        from ventilation_company.database.db import SessionLocal
+        from ventilation_company.database.repositories.settings_repo import SettingsRepository
+
+        return SettingsRepository(SessionLocal())
+
+    def _products(self):
+        from ventilation_company.database.db import SessionLocal
+        from ventilation_company.database.repositories.product_repo import ProductRepository
+
+        return ProductRepository(SessionLocal())
+
+    def _materials(self):
+        from ventilation_company.database.db import SessionLocal
+        from ventilation_company.database.repositories.material_repo import MaterialRepository
+
+        return MaterialRepository(SessionLocal())
 
     def build_calculator(self):
         # ── Toolbar ──
@@ -398,15 +417,40 @@ class DetailCalculatorFrame(tk.Frame):
 
     def load_calc_data(self):
         types = ProductRepo.get_all_types()
-        self.product_types = [dict(t) for t in types]
+        self.product_types = [
+            {"id": t.id, "name": t.name, "slug": t.slug, "icon": t.icon} for t in types
+        ]
         if hasattr(self, "calc_type"):
             self.calc_type["values"] = [t["name"] for t in self.product_types]
 
         subtypes = ProductRepo.get_all_subtypes()
-        self.all_subtypes = [dict(s) for s in subtypes]
+        self.all_subtypes = [
+            {
+                "id": s.id,
+                "name": s.name,
+                "slug": s.slug,
+                "product_type_id": s.product_type_id,
+                "formula": s.formula,
+                "shape_type": s.shape_type,
+                "flange_perimeter_formula": s.flange_perimeter_formula,
+                "waste_factor": s.waste_factor,
+                "labor_norm": s.labor_norm,
+            }
+            for s in subtypes
+        ]
 
         mats = MaterialRepo.get_all_materials()
-        self.all_materials = [dict(m) for m in mats]
+        self.all_materials = [
+            {
+                "id": m.id,
+                "name": m.name,
+                "grade": m.grade,
+                "thickness": m.thickness,
+                "price_per_m2": m.price_per_m2,
+                "unit": m.unit,
+            }
+            for m in mats
+        ]
 
     def on_calc_type_change(self, event=None):
         type_name = self.calc_type.get()
@@ -424,7 +468,17 @@ class DetailCalculatorFrame(tk.Frame):
             return
 
         mats = MaterialRepo.get_materials_by_subtype(subtype["id"])
-        mat_list = [dict(m) for m in mats]
+        mat_list = [
+            {
+                "id": m.id,
+                "name": m.name,
+                "grade": m.grade,
+                "thickness": m.thickness,
+                "price_per_m2": m.price_per_m2,
+                "unit": m.unit,
+            }
+            for m in mats
+        ]
         self.calc_material["values"] = [
             f"{m['name']} {m['thickness']} мм — {m['price_per_m2']} грн/м²" for m in mat_list
         ]
@@ -1441,9 +1495,7 @@ class DetailCalculatorFrame(tk.Frame):
             self.types_tree.delete(row)
         types = ProductRepo.get_all_types()
         for t in types:
-            self.types_tree.insert(
-                "", "end", values=(t["id"], t["name"], t["slug"], t["icon"] or "")
-            )
+            self.types_tree.insert("", "end", values=(t.id, t.name, t.slug, t.icon or ""))
 
     def on_type_select(self, event=None):
         selected = self.types_tree.selection()
@@ -2351,21 +2403,21 @@ class DetailCalculatorFrame(tk.Frame):
         total_fixed = 0
         total_percent = 0
         for it in items:
-            if it["type"] == "fixed":
-                per_unit = it["value"] / monthly if monthly > 0 else 0
-                note = f"{it['value']} грн/міс ≈ {per_unit:.2f} грн/шт (при {monthly} шт/міс)"
-                total_fixed += it["value"]
+            if it.type == "fixed":
+                per_unit = it.value / monthly if monthly > 0 else 0
+                note = f"{it.value} грн/міс ≈ {per_unit:.2f} грн/шт (при {monthly} шт/міс)"
+                total_fixed += it.value
             else:
-                note = f"{it['value']}% від (матеріал + робота)"
-                total_percent += it["value"]
+                note = f"{it.value}% від (матеріал + робота)"
+                total_percent += it.value
             self.overhead_tree.insert(
                 "",
                 "end",
                 values=(
-                    it["id"],
-                    it["name"],
-                    "Фіксована" if it["type"] == "fixed" else "Відсоток",
-                    f"{it['value']} {'грн' if it['type'] == 'fixed' else '%'}",
+                    it.id,
+                    it.name,
+                    "Фіксована" if it.type == "fixed" else "Відсоток",
+                    f"{it.value} {'грн' if it.type == 'fixed' else '%'}",
                     note,
                 ),
             )

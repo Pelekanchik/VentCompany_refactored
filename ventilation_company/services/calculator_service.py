@@ -6,8 +6,10 @@
 from math import pi
 from typing import Any
 
-from ventilation_company.database.repositories.calc_repo import CalcRepo
-from ventilation_company.database.repositories.settings_repo import SettingsRepo
+from ventilation_company.database.repositories.calc_repo import CalculationRepository as CalcRepo
+from ventilation_company.database.repositories.settings_repo import (
+    SettingsRepository as SettingsRepo,
+)
 
 
 class CalculatorService:

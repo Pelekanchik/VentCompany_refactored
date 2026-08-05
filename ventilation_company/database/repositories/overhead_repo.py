@@ -2,6 +2,7 @@
 
 from sqlalchemy.orm import Session
 
+from ventilation_company.database.db import SessionLocal
 from ventilation_company.database.models.calc import OverheadItem
 
 
@@ -48,3 +49,12 @@ class OverheadRepository:
         self.db.delete(item)
         self.db.commit()
         return True
+
+    def get_all(self) -> list[OverheadItem]:
+        """Alias for get_all_items."""
+        return self.get_all_items()
+
+
+# Зворотна сумісність
+OverheadRepo = OverheadRepository
+OverheadRepo = OverheadRepository(SessionLocal())

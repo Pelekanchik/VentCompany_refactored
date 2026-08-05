@@ -42,7 +42,9 @@ class TemplateService:
         template_id: int, client_name: str = "", client_phone: str = ""
     ) -> int | None:
         """Застосовує шаблон — створює новий розрахунок на основі шаблону."""
-        from ventilation_company.database.repositories.calc_repo import CalcRepo
+        from ventilation_company.database.repositories.calc_repo import (
+            CalculationRepository as CalcRepo,
+        )
 
         template = TemplateRepo.get_by_id(template_id)
         if not template:

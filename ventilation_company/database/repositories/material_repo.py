@@ -2,6 +2,7 @@
 
 from sqlalchemy.orm import Session
 
+from ventilation_company.database.db import SessionLocal
 from ventilation_company.database.models.calc import CalcMaterial, SubtypeMaterial
 
 
@@ -88,3 +89,9 @@ class MaterialRepository:
         self.db.commit()
         self.db.refresh(sm)
         return sm
+
+
+# Зворотна сумісність
+MaterialRepo = MaterialRepository
+
+MaterialRepo = MaterialRepository(SessionLocal())
