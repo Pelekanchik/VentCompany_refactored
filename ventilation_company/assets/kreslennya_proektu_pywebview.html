@@ -1,0 +1,1957 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Креслення проекту — 2D Архітектурний редактор</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; overflow: hidden; }
+#app { display: flex; flex-direction: column; height: 100vh; }
+.toolbar { display: flex; gap: 6px; padding: 10px 14px; background: #2c3e50; flex-wrap: wrap; align-items: center; position: relative; }
+.tool-btn, #clear-btn, #export-btn, #import-btn { padding: 8px 14px; border: none; border-radius: 6px; background: #34495e; color: #ecf0f1; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+.tool-btn:hover, #clear-btn:hover, #export-btn:hover, #import-btn:hover { background: #1abc9c; }
+.tool-btn.active { background: #e74c3c; }
+.sub-toolbar { padding: 8px 14px; background: #ecf0f1; border-bottom: 1px solid #bdc3c7; font-size: 13px; color: #2c3e50; display: flex; gap: 12px; align-items: center; }
+.canvas-wrapper { flex: 1; position: relative; overflow: hidden; background: #fff; }
+#canvas { display: block; cursor: crosshair; outline: none; width: 100%; height: 100%; }
+.coords { position: absolute; bottom: 10px; left: 10px; background: rgba(0,0,0,0.7); color: #fff; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-family: monospace; }
+.zoom-controls { position: absolute; bottom: 10px; right: 10px; display: flex; gap: 4px; }
+.zoom-controls button { width: 32px; height: 32px; border: none; border-radius: 4px; background: #2c3e50; color: #fff; font-size: 16px; cursor: pointer; }
+.zoom-controls button:hover { background: #1abc9c; }
+.properties { position: absolute; top: 90px; left: 10px; width: 240px; background: rgba(255,255,255,0.97); border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.15); padding: 12px; font-size: 13px; max-height: 85vh; overflow-y: auto; pointer-events: auto; z-index: 100; }
+.properties h3 { margin: 0 0 10px 0; font-size: 14px; color: #2c3e50; border-bottom: 1px solid #bdc3c7; padding-bottom: 6px; }
+#prop-content { color: #555; }
+.prop-row { display: flex; justify-content: space-between; margin: 6px 0; align-items: center; }
+.prop-label { color: #7f8c8d; }
+.prop-value { font-weight: 600; color: #2c3e50; }
+.prop-input { width: 100%; padding: 5px 8px; border: 1px solid #bdc3c7; border-radius: 4px; font-size: 12px; margin-top: 4px; font-family: inherit; }
+.prop-input:focus { border-color: #3498db; outline: none; }
+.prop-btn { width: 100%; padding: 7px; margin-top: 10px; border: none; border-radius: 4px; background: #3498db; color: #fff; font-size: 12px; cursor: pointer; }
+.prop-btn:hover { background: #2980b9; }
+.prop-btn.delete { background: #e74c3c; }
+.prop-btn.delete:hover { background: #c0392b; }
+#file-input { display: none; }
+.vent-dropdown { position: absolute; top: 50px; left: 360px; background: #34495e; border-radius: 6px; padding: 6px; display: none; flex-direction: column; gap: 4px; z-index: 200; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+.vent-dropdown.visible { display: flex; }
+.vent-dropdown button { background: #2c3e50; color: #ecf0f1; border: none; padding: 8px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; text-align: left; transition: all 0.2s; white-space: nowrap; }
+.vent-dropdown button:hover { background: #1abc9c; }
+
+/* Tab styles */
+.tab-group { position: relative; }
+.tab-label {
+  padding: 8px 14px; border-radius: 6px; background: #34495e; color: #ecf0f1;
+  font-size: 13px; cursor: pointer; transition: all 0.2s; border: none;
+  display: flex; align-items: center; gap: 6px; font-family: inherit;
+}
+.tab-label:hover { background: #1abc9c; }
+.tab-label.active { background: #e74c3c; }
+.tab-panel {
+  position: absolute; top: calc(100% + 6px); left: 0; background: #34495e;
+  border-radius: 8px; padding: 6px; display: none; flex-direction: column;
+  gap: 4px; z-index: 300; box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  min-width: 180px; border: 1px solid #4a6278;
+}
+.tab-panel.visible { display: flex; }
+.tab-panel button {
+  background: #2c3e50; color: #ecf0f1; border: none; padding: 8px 14px;
+  border-radius: 4px; cursor: pointer; font-size: 13px; text-align: left;
+  transition: all 0.2s; white-space: nowrap; display: flex;
+  align-items: center; gap: 8px; font-family: inherit;
+}
+.tab-panel button:hover { background: #1abc9c; }
+.tab-panel button.active { background: #e74c3c; }
+.toolbar-sep { width: 1px; height: 28px; background: #4a6278; margin: 0 4px; }
+
+.vent-list-header { color: #95a5a6; font-size: 11px; padding: 4px 8px; text-transform: uppercase; border-top: 1px solid #4a6278; margin-top: 4px; }
+.vent-list-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 8px; color: #ecf0f1; font-size: 12px; border-radius: 3px; cursor: pointer; }
+.vent-list-item:hover { background: #1abc9c; }
+.vent-list-item button { background: transparent; border: none; color: #e74c3c; cursor: pointer; font-size: 12px; padding: 0 4px; }
+.vent-list-item button:hover { color: #c0392b; }
+@media print {
+  .toolbar, .sub-toolbar, .properties, .zoom-controls, .coords, .vent-dropdown, .tab-panel { display: none !important; }
+  #app { height: auto; }
+  .canvas-wrapper { position: static; height: auto; overflow: visible; }
+  #canvas { position: static; }
+  body { overflow: visible; background: #fff; }
+}
+.callout-line { stroke: #2c3e50; stroke-width: 1; fill: none; }
+.callout-box { fill: #fff; stroke: #2c3e50; stroke-width: 1; }
+.callout-text { font: 11px Segoe UI; fill: #2c3e50; }
+
+/* Symbol Editor Modal */
+#sym-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; justify-content: center; align-items: center; }
+#sym-overlay.visible { display: flex; }
+.sym-panel { background: #fff; border-radius: 8px; padding: 16px; display: flex; flex-direction: column; gap: 10px; max-width: 90vw; max-height: 90vh; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+.sym-panel h3 { margin: 0; font-size: 16px; color: #2c3e50; }
+.sym-toolbar { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.symtool { padding: 6px 12px; border: none; border-radius: 4px; background: #ecf0f1; color: #2c3e50; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+.symtool:hover { background: #bdc3c7; }
+.symtool.active { background: #e74c3c; color: #fff; }
+#sym-canvas { border: 1px solid #bdc3c7; cursor: crosshair; background: #fafafa; display: block; }
+.sym-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.sym-actions button { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+#sym-cancel { background: #ecf0f1; color: #2c3e50; }
+#sym-done { background: #3498db; color: #fff; }
+#sym-cancel:hover { background: #bdc3c7; }
+#sym-done:hover { background: #2980b9; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="toolbar" id="main-toolbar">
+    <button data-tool="select" class="tool-btn active">🖱️ Вибір</button>
+    <button data-tool="delete" class="tool-btn">🗑️ Видалити</button>
+    <div class="toolbar-sep"></div>
+
+    <div class="tab-group" id="tab-arch">
+      <button class="tab-label" data-tab="arch">🏛️ Архітектура ▼</button>
+      <div class="tab-panel" id="panel-arch">
+        <button data-tool="wall" class="tool-btn">🧱 Стіна</button>
+        <button data-tool="window" class="tool-btn">🪟 Вікно</button>
+        <button data-tool="door" class="tool-btn">🚪 Двері</button>
+      </div>
+    </div>
+
+    <div class="tab-group" id="tab-vent">
+      <button class="tab-label" data-tab="vent">💨 Вентиляція ▼</button>
+      <div class="tab-panel" id="panel-vent">
+        <div style="border-bottom:1px solid #4a6278; padding-bottom:4px; margin-bottom:4px;">
+          <button data-vent="duct">💨 Круглий повітропровід</button>
+          <button data-vent="rect_duct">▭ Прямокутний повітропровід</button>
+          <button data-vent="grille">⬜ Накладна решітка</button>
+          <button data-vent="fan">🌀 Канальний вентилятор</button>
+          <button data-vent="silencer">📦 Глушитель</button>
+          <button data-vent="damper">🔧 Дросель-клапан</button>
+        </div>
+        <div id="custom-templates" style="border-bottom:1px solid #4a6278; padding-bottom:4px; margin-bottom:4px; display:none;"></div>
+        <button data-vent="custom">➕ Додати елемент</button>
+        <div id="vent-list" style="max-height:200px; overflow-y:auto;"></div>
+      </div>
+    </div>
+
+    <div class="tab-group" id="tab-measure">
+      <button class="tab-label" data-tab="measure">📏 Вимір ▼</button>
+      <div class="tab-panel" id="panel-measure">
+        <button data-tool="dimension" class="tool-btn">📏 Розмірна лінія</button>
+        <button data-tool="callout" class="tool-btn">📝 Виноска</button>
+      </div>
+    </div>
+
+    <div class="tab-group" id="tab-results">
+      <button class="tab-label" data-tab="results">📋 Результати ▼</button>
+      <div class="tab-panel" id="panel-results">
+        <button id="save-file-btn">💾 Зберегти файл</button>
+        <button id="export-btn">📤 Експорт JSON</button>
+        <button id="import-btn">📂 Імпорт JSON</button>
+        <button id="save-img-btn">🖼️ Зберегти зображення</button>
+        <button id="print-btn">🖨️ Друк</button>
+        <button id="pdf-btn">📄 PDF</button>
+      </div>
+    </div>
+
+    <div class="toolbar-sep"></div>
+    <button id="clear-btn">🧹 Очистити</button>
+    <button id="save-project-btn" style="background:#27ae60;">💾 Зберегти в проєкт</button>
+    <button id="close-editor-btn" style="background:#c0392b;">❌ Закрити</button>
+    <input type="file" id="file-input" accept=".json">
+    <div id="py-status" style="margin-left:auto;padding:6px 14px;border-radius:6px;font-size:13px;font-family:monospace;background:#2c3e50;color:#f1c40f;border:2px solid #f39c12;font-weight:bold;">⏳ Python: перевірка...</div>
+  </div>
+  <div class="sub-toolbar" id="sub-toolbar">
+    <span id="tool-hint">Виберіть інструмент з панелі</span>
+  </div>
+  <div class="canvas-wrapper">
+    <canvas id="canvas" tabindex="0"></canvas>
+    <div class="coords" id="coords">X: 0 | Y: 0</div>
+    <div class="zoom-controls">
+      <button id="zoom-in">+</button>
+      <button id="zoom-out">−</button>
+      <button id="zoom-reset">1:1</button>
+    </div>
+  </div>
+  <div class="properties" id="properties">
+    <h3>📋 Властивості</h3>
+    <div id="prop-content">Нічого не вибрано</div>
+  </div>
+</div>
+
+<!-- Symbol Editor Modal -->
+<div id="sym-overlay">
+  <div class="sym-panel">
+    <h3>🎨 Редактор символу</h3>
+    <div class="sym-toolbar">
+      <button data-symtool="select" class="symtool active">🖱️ Вибір</button>
+      <button data-symtool="line" class="symtool">📏 Лінія</button>
+      <button data-symtool="arc" class="symtool">⌒ Дуга</button>
+      <button data-symtool="circle" class="symtool">⭕ Коло</button>
+      <button data-symtool="delete" class="symtool">🗑️ Видалити</button>
+      <button id="sym-clear">🧹 Очистити</button>
+    </div>
+    <canvas id="sym-canvas" width="400" height="400"></canvas>
+    <div class="sym-actions">
+      <button id="sym-cancel">Скасувати</button>
+      <button id="sym-done">Готово</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+(function() {
+  // ===== MAIN CANVAS =====
+  const canvas = document.getElementById('canvas');
+  const ctx = canvas.getContext('2d');
+  const coordsEl = document.getElementById('coords');
+  const propContent = document.getElementById('prop-content');
+  const toolHint = document.getElementById('tool-hint');
+  const toolBtns = document.querySelectorAll('.tool-btn[data-tool]');
+  const tabLabels = document.querySelectorAll('.tab-label');
+  const tabPanels = document.querySelectorAll('.tab-panel');
+
+  let scale = 0.05;  // початковий масштаб зменшено для вміщення на екрані
+  let offsetX = 0, offsetY = 0;
+  let currentTool = 'select';
+  let currentVentKind = null;
+  let currentDuctShape = 'round';
+  let isPanning = false;
+  let panStart = null;
+  let tempShape = null;
+  let selectedId = null;
+  let hoverId = null;
+  let draggingElement = null;
+  let dragOffset = null;
+  let snapPoint = null;
+
+  const GRID_SIZE = 20;
+  const SNAP_DIST = 12;
+
+  let elements = [];
+  let idCounter = 1;
+
+  let projectId = null;
+  let projectName = '';
+  const isPyWebView = !!(window.pywebview && window.pywebview.api);
+
+  const MAX_HISTORY = 50;
+  let history = [];
+  let historyIndex = -1;
+
+  let customTemplates = [];
+  let currentCustomTemplate = null;
+  let symbolEditorCallback = null;
+  let symbolEditorTarget = null;
+
+  function saveTemplatesToStorage() {
+    try { localStorage.setItem('ventTemplates', JSON.stringify(customTemplates)); } catch(e) {}
+  }
+  function loadTemplatesFromStorage() {
+    try {
+      const data = localStorage.getItem('ventTemplates');
+      if (data) { customTemplates = JSON.parse(data); }
+    } catch(e) { customTemplates = []; }
+  }
+  function saveIdCounterToStorage() {
+    try { localStorage.setItem('ventIdCounter', String(idCounter)); } catch(e) {}
+  }
+  function loadIdCounterFromStorage() {
+    try {
+      const val = localStorage.getItem('ventIdCounter');
+      if (val) { idCounter = Math.max(idCounter, parseInt(val, 10) || 1); }
+    } catch(e) {}
+  }
+
+  function deactivateAllTools() {
+    document.querySelectorAll('.tool-btn[data-tool]').forEach(function(b) { b.classList.remove('active'); });
+  }
+
+
+async function initPyWebView() {
+    const statusEl = document.getElementById('py-status');
+    try {
+      if (typeof window.pywebview === 'undefined' || !window.pywebview.api) {
+        if (statusEl) { statusEl.textContent = '⚠️ Файловий режим'; statusEl.style.background = '#7f8c8d'; }
+        return;
+      }
+      const info = await window.pywebview.api.get_project_info();
+      console.log('[JS] get_project_info:', info);
+      if (info && info.project_id !== undefined) {
+        projectId = info.project_id;
+        projectName = info.project_name || '';
+        document.title = 'Креслення — ' + projectName;
+        if (statusEl) { statusEl.textContent = '✅ PID=' + projectId; statusEl.style.background = '#27ae60'; }
+        const data = await window.pywebview.api.load_drawing(projectId);
+        console.log('[JS] load_drawing:', data ? 'знайдено' : 'немає');
+        if (data) {
+          elements = JSON.parse(data);
+          const maxId = Math.max.apply(null, elements.map(function(el){return el.id||0;}).concat([0]));
+          idCounter = Math.max(idCounter, maxId + 1);
+          history = [JSON.parse(JSON.stringify(elements))];
+          historyIndex = 0;
+          draw();
+        }
+      }
+    } catch(e) {
+      console.error('[JS] initPyWebView error:', e);
+      if (statusEl) { statusEl.textContent = '❌ ' + (e.message || 'помилка'); statusEl.style.background = '#c0392b'; }
+    }
+  }
+  window.addEventListener('pywebviewready', function() {
+    console.log('[JS] pywebviewready!');
+    initPyWebView();
+  });
+
+
+function saveState() {
+    if (historyIndex < history.length - 1) {
+      history = history.slice(0, historyIndex + 1);
+    }
+    history.push(JSON.parse(JSON.stringify(elements)));
+    if (history.length > MAX_HISTORY) { history.shift(); }
+    historyIndex = history.length - 1;
+    // Auto-save to localStorage
+    try { localStorage.setItem('projectAutoSave', JSON.stringify(elements)); } catch(e) {}
+
+        // Збереження в Python/БД
+    if (isPyWebView && projectId) {
+      window.pywebview.api.save_drawing(projectId, JSON.stringify(elements)).catch(function(e){});
+    }
+  }
+
+  function undo() {
+    if (historyIndex > 0) {
+      historyIndex--;
+      elements = JSON.parse(JSON.stringify(history[historyIndex]));
+      selectedId = null; tempShape = null; draggingElement = null;
+      updateProps(); draw();
+    }
+  }
+
+  function resize() {
+    const wrapper = canvas.parentElement;
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = wrapper.clientWidth || 800;
+    const cssH = wrapper.clientHeight || 600;
+    canvas.width = cssW * dpr;
+    canvas.height = cssH * dpr;
+    canvas.style.width = cssW + 'px';
+    canvas.style.height = cssH + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    draw();
+  }
+  window.addEventListener('resize', resize);
+
+  function toWorld(x, y) {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(offsetX) || !Number.isFinite(offsetY) || !Number.isFinite(scale) || scale === 0) return { x: 0, y: 0 };
+    return { x: (x - offsetX) / scale, y: (y - offsetY) / scale };
+  }
+  function toScreen(x, y) {
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(offsetX) || !Number.isFinite(offsetY) || !Number.isFinite(scale)) return { x: 0, y: 0 };
+    return { x: x * scale + offsetX, y: y * scale + offsetY };
+  }
+  function snap(v) { return Number.isFinite(v) ? Math.round(v / 10) * 10 : 0; }
+
+  function getAllSnapPoints() {
+    const pts = [];
+    elements.forEach(function(el) {
+      if (!el || !el.type) return;
+      if (el.type === 'wall' || el.type === 'vent' || el.type === 'dimension') {
+        pts.push({ x: el.x1, y: el.y1, type: 'end', el: el });
+        pts.push({ x: el.x2, y: el.y2, type: 'end', el: el });
+        pts.push({ x: (el.x1 + el.x2)/2, y: (el.y1 + el.y2)/2, type: 'mid', el: el });
+      }
+      if (el.type === 'window' || el.type === 'door' || el.type === 'vent_equip') {
+        pts.push({ x: el.x, y: el.y, type: 'center', el: el });
+        // Circle edge snap points for vent_equip (fan, custom circles)
+        if (el.type === 'vent_equip') {
+          const rot = (el.rotation || 0) * Math.PI / 180;
+          const w = el.width || 60, h = el.height || 40;
+          const rx = w / 2, ry = h / 2;
+          const dirs = [
+            { dx: rx, dy: 0, label: 'right' },
+            { dx: -rx, dy: 0, label: 'left' },
+            { dx: 0, dy: ry, label: 'bottom' },
+            { dx: 0, dy: -ry, label: 'top' }
+          ];
+          dirs.forEach(function(d) {
+            const localX = d.dx * Math.cos(rot) - d.dy * Math.sin(rot);
+            const localY = d.dx * Math.sin(rot) + d.dy * Math.cos(rot);
+            pts.push({ x: el.x + localX, y: el.y + localY, type: 'circle-edge', el: el });
+          });
+        }
+      }
+    });
+    return pts;
+  }
+
+  function findSnap(wx, wy, excludeId) {
+    const pts = getAllSnapPoints();
+    let best = null, bestDist = SNAP_DIST;
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      if (excludeId && p.el.id === excludeId) continue;
+      const d = Math.hypot(p.x - wx, p.y - wy);
+      if (d < bestDist) { bestDist = d; best = p; }
+    }
+    return best;
+  }
+
+  function findNearestVent(wx, wy) {
+    let best = null, bestDist = Infinity;
+    elements.forEach(function(el) {
+      if (el.type !== 'vent') return;
+      const d = pointToSegmentDist(wx, wy, el.x1, el.y1, el.x2, el.y2);
+      if (d < bestDist) { bestDist = d; best = el; }
+    });
+    return best ? { el: best, dist: bestDist } : null;
+  }
+
+  function snapVentEquip(wx, wy, w, h) {
+    const nv = findNearestVent(wx, wy);
+    // If no vent nearby (< 60 mm), place exactly where clicked (grid-snapped)
+    if (!nv || nv.dist > 60) return { x: snap(wx), y: snap(wy), rotation: 0 };
+    const v = nv.el;
+    const dx = v.x2 - v.x1, dy = v.y2 - v.y1;
+    const len = Math.hypot(dx, dy);
+    if (len === 0) return { x: snap(wx), y: snap(wy), rotation: 0 };
+    const t = ((wx - v.x1) * dx + (wy - v.y1) * dy) / (len * len);
+    const clampedT = Math.max(0, Math.min(1, t));
+    const projX = v.x1 + clampedT * dx;
+    const projY = v.y1 + clampedT * dy;
+    const perpX = -(dy / len);
+    const perpY = dx / len;
+    const mouseDx = wx - projX;
+    const mouseDy = wy - projY;
+    const side = mouseDx * perpX + mouseDy * perpY;
+    const halfD = Math.max(v.diameter1 || 160, v.diameter2 || v.diameter1 || 160) / 2;
+    const halfW = w / 2;
+    const distToCenter = Math.abs(side);
+    const distToEdge = Math.abs(distToCenter - halfD);
+    if (distToEdge < distToCenter && distToEdge < SNAP_DIST * 3) {
+      const offsetDir = side >= 0 ? 1 : -1;
+      const offset = (halfD + halfW) * offsetDir;
+      return {
+        x: snap(projX + perpX * offset),
+        y: snap(projY + perpY * offset),
+        rotation: Math.atan2(dy, dx) * 180 / Math.PI
+      };
+    }
+    return {
+      x: snap(projX),
+      y: snap(projY),
+      rotation: Math.atan2(dy, dx) * 180 / Math.PI
+    };
+  }
+
+  function pointToSegmentDist(px, py, x1, y1, x2, y2) {
+    const l2 = (x1-x2)*(x1-x2) + (y1-y2)*(y1-y2);
+    if (l2 === 0) return Math.hypot(px-x1, py-y1);
+    let t = ((px-x1)*(x2-x1) + (py-y1)*(y2-y1)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t*(x2-x1)), py - (y1 + t*(y2-y1)));
+  }
+
+  function pointInRotatedRect(px, py, cx, cy, w, h, rotDeg) {
+    const rad = rotDeg * Math.PI / 180;
+    const dx = px - cx, dy = py - cy;
+    const localX = dx * Math.cos(-rad) - dy * Math.sin(-rad);
+    const localY = dx * Math.sin(-rad) + dy * Math.cos(-rad);
+    const pad = 8;
+    return Math.abs(localX) <= w/2 + pad && Math.abs(localY) <= h/2 + pad;
+  }
+
+  function getElementAt(wx, wy) {
+    const rev = elements.slice().reverse();
+    for (let i = 0; i < rev.length; i++) {
+      const el = rev[i];
+      if (el.type === 'window' || el.type === 'door' || el.type === 'vent_equip') {
+        const w = el.width || (el.type === 'window' ? 60 : 40);
+        const h = el.height || (el.type === 'window' ? 8 : 6);
+        if (pointInRotatedRect(wx, wy, el.x, el.y, w, h, el.rotation || 0)) return el;
+      }
+    }
+    for (let i = 0; i < rev.length; i++) {
+      const el = rev[i];
+      if (el.type === 'callout') {
+        const dLine = pointToSegmentDist(wx, wy, el.x1, el.y1, el.x2, el.y2);
+        const dEnd = Math.hypot(wx - el.x2, wy - el.y2);
+        if (dLine < 10 || dEnd < 20) return el;
+      }
+    }
+    for (let i = 0; i < rev.length; i++) {
+      const el = rev[i];
+      if (el.type === 'wall') {
+        const d = pointToSegmentDist(wx, wy, el.x1, el.y1, el.x2, el.y2);
+        if (d < 12) return el;
+      } else if (el.type === 'vent') {
+        const d = pointToSegmentDist(wx, wy, el.x1, el.y1, el.x2, el.y2);
+        const hitDist = el.shape === 'rect' ? (Math.max(el.rectW, el.rectH, 160) / 25 + 4) : (Math.max(el.diameter1, el.diameter2 || el.diameter1, 160) * 0.6 / scale + 4);
+        if (d < hitDist) return el;
+      } else if (el.type === 'dimension') {
+        const d = pointToSegmentDist(wx, wy, el.x1, el.y1, el.x2, el.y2);
+        if (d < 10) return el;
+      }
+    }
+    return null;
+  }
+
+  function drawGrid() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
+    const tl = toWorld(0, 0), br = toWorld(w, h);
+    const startX = Math.floor(tl.x / GRID_SIZE) * GRID_SIZE;
+    const startY = Math.floor(tl.y / GRID_SIZE) * GRID_SIZE;
+    ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = 0.5;
+    for (let x = startX; x <= br.x; x += GRID_SIZE) {
+      const sx = toScreen(x, 0).x;
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
+    }
+    for (let y = startY; y <= br.y; y += GRID_SIZE) {
+      const sy = toScreen(0, y).y;
+      ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke();
+    }
+    ctx.strokeStyle = '#c8c8c8'; ctx.lineWidth = 0.8;
+    for (let x = startX; x <= br.x; x += GRID_SIZE * 5) {
+      const sx = toScreen(x, 0).x;
+      ctx.beginPath(); ctx.moveTo(sx, 0); ctx.lineTo(sx, h); ctx.stroke();
+    }
+    for (let y = startY; y <= br.y; y += GRID_SIZE * 5) {
+      const sy = toScreen(0, y).y;
+      ctx.beginPath(); ctx.moveTo(0, sy); ctx.lineTo(w, sy); ctx.stroke();
+    }
+  }
+
+  function drawSnapIndicator() {
+    if (!snapPoint) return;
+    const sp = toScreen(snapPoint.x, snapPoint.y);
+    const size = 6;
+    ctx.fillStyle = '#2ecc71'; ctx.strokeStyle = '#27ae60'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.rect(sp.x - size, sp.y - size, size * 2, size * 2); ctx.fill(); ctx.stroke();
+  }
+
+  function drawWall(el) {
+    const p1 = toScreen(el.x1, el.y1), p2 = toScreen(el.x2, el.y2);
+    const isSel = el.id === selectedId;
+    const dx = p2.x - p1.x, dy = p2.y - p1.y;
+    const len = Math.hypot(dx, dy);
+    if (len === 0) return;
+    const ux = dx / len, uy = dy / len;
+    const nx = -uy, ny = ux; // perpendicular
+    const halfT = ((el.thickness || 6) * scale) / 2;
+    // Four corner points
+    const a1x = p1.x + nx * halfT, a1y = p1.y + ny * halfT;
+    const a2x = p2.x + nx * halfT, a2y = p2.y + ny * halfT;
+    const b2x = p2.x - nx * halfT, b2y = p2.y - ny * halfT;
+    const b1x = p1.x - nx * halfT, b1y = p1.y - ny * halfT;
+    // Draw outer contour
+    ctx.strokeStyle = isSel ? '#e74c3c' : '#5d4037';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(a1x, a1y); ctx.lineTo(a2x, a2y);
+    ctx.lineTo(b2x, b2y); ctx.lineTo(b1x, b1y);
+    ctx.closePath(); ctx.stroke();
+    // Draw hatching (diagonal lines)
+    ctx.strokeStyle = isSel ? 'rgba(231,76,60,0.4)' : 'rgba(93,64,55,0.35)';
+    ctx.lineWidth = 0.6;
+    const hatchStep = Math.max(4, 6 * scale);
+    const hatchLen = len;
+    // Hatch angle 45° relative to wall direction
+    const hdx = (ux + nx) * 0.707;
+    const hdy = (uy + ny) * 0.707;
+    for (let s = -halfT; s < hatchLen + halfT; s += hatchStep) {
+      // Start point along wall centerline
+      const sx = p1.x + ux * s;
+      const sy = p1.y + uy * s;
+      // Project onto both edges to find intersection segment
+      // We draw short diagonal segments across the wall thickness
+      const x1 = sx - nx * halfT;
+      const y1 = sy - ny * halfT;
+      const x2 = sx + nx * halfT;
+      const y2 = sy + ny * halfT;
+      ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+    }
+  }
+
+  function drawWindow(el) {
+    const p = toScreen(el.x, el.y);
+    const w = (el.width || 60) * scale, h = (el.height || 8) * scale;
+    const rot = (el.rotation || 0) * Math.PI / 180;
+    const isSel = el.id === selectedId;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(rot);
+    ctx.fillStyle = isSel ? 'rgba(231,76,60,0.35)' : 'rgba(52,152,219,0.25)';
+    ctx.strokeStyle = isSel ? '#e74c3c' : '#2980b9'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.rect(-w/2, -h/2, w, h); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = isSel ? '#e74c3c' : '#3498db'; ctx.lineWidth = 0.8;
+    ctx.beginPath(); ctx.moveTo(-w/2, 0); ctx.lineTo(w/2, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -h/2); ctx.lineTo(0, h/2); ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = '#2c3e50'; ctx.font = '10px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText(el.name || 'Вікно', p.x, p.y + h/2 + 14);
+  }
+
+  function drawDoor(el) {
+    const p = toScreen(el.x, el.y);
+    const w = (el.width || 40) * scale, h = (el.height || 6) * scale;
+    const rot = (el.rotation || 0) * Math.PI / 180;
+    const swing = el.swing || 'right', direction = el.direction || 'forward';
+    const isSel = el.id === selectedId;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(rot);
+    ctx.fillStyle = isSel ? 'rgba(231,76,60,0.35)' : 'rgba(149,165,166,0.25)';
+    ctx.strokeStyle = isSel ? '#e74c3c' : '#7f8c8d'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.rect(-w/2, -h/2, w, h); ctx.fill(); ctx.stroke();
+    const leafW = w * 0.9, leafH = h * 0.7;
+    ctx.fillStyle = isSel ? 'rgba(231,76,60,0.2)' : 'rgba(189,195,199,0.3)';
+    ctx.strokeStyle = isSel ? '#e74c3c' : '#95a5a6'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.rect(-leafW/2, -leafH/2, leafW, leafH); ctx.fill(); ctx.stroke();
+    const hingeX = swing === 'right' ? -leafW/2 : leafW/2;
+    ctx.fillStyle = isSel ? '#e74c3c' : '#7f8c8d';
+    ctx.beginPath(); ctx.arc(hingeX, 0, 2 * scale, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = isSel ? '#e74c3c' : '#7f8c8d'; ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]); ctx.beginPath();
+    const r = leafW;
+    if (swing === 'right') {
+      if (direction === 'forward') ctx.arc(-leafW/2, 0, r, 0, Math.PI/2);
+      else ctx.arc(-leafW/2, 0, r, -Math.PI/2, 0);
+    } else {
+      if (direction === 'forward') ctx.arc(leafW/2, 0, r, Math.PI/2, Math.PI);
+      else ctx.arc(leafW/2, 0, r, Math.PI, -Math.PI/2);
+    }
+    ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+    ctx.fillStyle = '#2c3e50'; ctx.font = '10px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText(el.name || 'Двері', p.x, p.y + h/2 + 14);
+  }
+
+  function drawVent(el) {
+    const p1 = toScreen(el.x1, el.y1), p2 = toScreen(el.x2, el.y2);
+    const isSel = el.id === selectedId;
+    const isSupply = (el.ventType || 'supply') === 'supply';
+    const fillColor = isSel ? '#e74c3c' : (isSupply ? '#3498db' : '#e91e63');
+    const strokeColor = isSel ? '#c0392b' : (isSupply ? '#2980b9' : '#c2185b');
+    const isRect = el.shape === 'rect';
+    const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x), perp = angle + Math.PI/2;
+    let dx1, dy1, dx2, dy2, halfThick;
+    if (isRect) {
+      // Scale same as round ducts: dimension / 25 (so 160mm -> ~6.4px at scale 1)
+      const t_rect = Math.max(2, (el.rectH || 100) * scale / 25);
+      halfThick = t_rect;
+      const hw = Math.max(2, (el.rectW || 160) * scale / 25);
+      dx1 = Math.cos(perp) * hw / 2; dy1 = Math.sin(perp) * hw / 2;
+      dx2 = dx1; dy2 = dy1;
+    } else {
+      const d1 = (el.diameter1 || 160), d2 = (el.diameter2 || d1);
+      const t1 = Math.max(2, d1 * scale / 25), t2 = Math.max(2, d2 * scale / 25);
+      halfThick = (t1 + t2) / 2;
+      dx1 = Math.cos(perp) * t1/2; dy1 = Math.sin(perp) * t1/2;
+      dx2 = Math.cos(perp) * t2/2; dy2 = Math.sin(perp) * t2/2;
+    }
+    ctx.fillStyle = fillColor; ctx.strokeStyle = strokeColor; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p1.x + dx1, p1.y + dy1); ctx.lineTo(p2.x + dx2, p2.y + dy2);
+    ctx.lineTo(p2.x - dx2, p2.y - dy2); ctx.lineTo(p1.x - dx1, p1.y - dy1);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    const midX = (p1.x + p2.x) / 2, midY = (p1.y + p2.y) / 2;
+    const arrowLen = 12 * scale, arrowW = 5 * scale;
+    ctx.save(); ctx.translate(midX, midY); ctx.rotate(angle);
+    ctx.fillStyle = '#fff'; ctx.strokeStyle = strokeColor; ctx.lineWidth = 1;
+    if (isSupply) {
+      ctx.beginPath(); ctx.moveTo(-arrowLen/2, 0); ctx.lineTo(arrowLen/2, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(arrowLen/2 - arrowW, -arrowW); ctx.lineTo(arrowLen/2, 0); ctx.lineTo(arrowLen/2 - arrowW, arrowW); ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else {
+      ctx.beginPath(); ctx.moveTo(arrowLen/2, 0); ctx.lineTo(-arrowLen/2, 0); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-arrowLen/2 + arrowW, -arrowW); ctx.lineTo(-arrowLen/2, 0); ctx.lineTo(-arrowLen/2 + arrowW, arrowW); ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
+    ctx.fillStyle = strokeColor; ctx.font = 'bold 10px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText(el.name || (isSupply ? 'Приплив' : 'Витяжка'), midX, midY - halfThick/2 - 4);
+    // Підпис із розміром труби
+    let sizeText = '';
+    if (isRect) {
+      sizeText = (el.rectW || 160) + '×' + (el.rectH || 100);
+    } else {
+      const d1 = (el.diameter1 || 160), d2 = (el.diameter2 || d1);
+      sizeText = (d1 === d2) ? ('Ø' + d1) : ('Ø' + d1 + '→Ø' + d2);
+    }
+    ctx.fillStyle = '#7f8c8d'; ctx.font = '9px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(sizeText, midX, midY + halfThick/2 + 4);
+  }
+
+  function drawDimension(el) {
+    const p1 = toScreen(el.x1, el.y1), p2 = toScreen(el.x2, el.y2);
+    const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+    const perp = angle + Math.PI/2;
+    const offsetPx = (el.offset || 30) * scale;
+    const ox = Math.cos(perp) * offsetPx, oy = Math.sin(perp) * offsetPx;
+    const d1x = p1.x + ox, d1y = p1.y + oy;
+    const d2x = p2.x + ox, d2y = p2.y + oy;
+    ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = 0.8; ctx.setLineDash([2, 2]);
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(d1x, d1y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(p2.x, p2.y); ctx.lineTo(d2x, d2y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.moveTo(d1x, d1y); ctx.lineTo(d2x, d2y); ctx.stroke();
+    const tick = 5;
+    ctx.strokeStyle = '#e67e22'; ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(d1x + Math.cos(angle + Math.PI/2)*tick, d1y + Math.sin(angle + Math.PI/2)*tick);
+    ctx.lineTo(d1x - Math.cos(angle + Math.PI/2)*tick, d1y - Math.sin(angle + Math.PI/2)*tick);
+    ctx.moveTo(d2x + Math.cos(angle + Math.PI/2)*tick, d2y + Math.sin(angle + Math.PI/2)*tick);
+    ctx.lineTo(d2x - Math.cos(angle + Math.PI/2)*tick, d2y - Math.sin(angle + Math.PI/2)*tick);
+    ctx.stroke();
+    const dist = Math.sqrt((el.x2-el.x1)*(el.x2-el.x1) + (el.y2-el.y1)*(el.y2-el.y1));
+    const mid = { x: (d1x + d2x)/2, y: (d1y + d2y)/2 };
+    ctx.fillStyle = '#fff'; ctx.fillRect(mid.x - 22, mid.y - 14, 44, 18);
+    ctx.fillStyle = '#e67e22'; ctx.font = 'bold 12px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(dist.toFixed(0) + ' мм', mid.x, mid.y - 4);
+  }
+
+  function drawVentEquip(el) {
+    const p = toScreen(el.x, el.y);
+    const w = (el.width || 60) * scale, h = (el.height || 40) * scale;
+    const rot = (el.rotation || 0) * Math.PI / 180;
+    const isSel = el.id === selectedId;
+    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(rot);
+    const fillColor = isSel ? 'rgba(231,76,60,0.35)' : 'rgba(52,152,219,0.2)';
+    const strokeColor = isSel ? '#e74c3c' : '#2980b9';
+
+    if (el.kind === 'grille') {
+      const isSupply = (el.ventType || 'supply') === 'supply';
+      ctx.fillStyle = isSel ? 'rgba(231,76,60,0.35)' : (isSupply ? 'rgba(52,152,219,0.2)' : 'rgba(231,76,60,0.2)');
+      ctx.strokeStyle = isSel ? '#e74c3c' : (isSupply ? '#2980b9' : '#c0392b'); ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.rect(-w/2, -h/2, w, h); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = isSel ? '#e74c3c' : (isSupply ? '#3498db' : '#e74c3c'); ctx.lineWidth = 0.8;
+      const cols = 4, rows = 3;
+      for (let i = 1; i < cols; i++) { const x = -w/2 + (w/cols)*i; ctx.beginPath(); ctx.moveTo(x, -h/2); ctx.lineTo(x, h/2); ctx.stroke(); }
+      for (let i = 1; i < rows; i++) { const y = -h/2 + (h/rows)*i; ctx.beginPath(); ctx.moveTo(-w/2, y); ctx.lineTo(w/2, y); ctx.stroke(); }
+      ctx.strokeStyle = isSel ? '#e74c3c' : (isSupply ? '#3498db' : '#e74c3c'); ctx.lineWidth = 1.5;
+      const arrLen = w * 0.3, arrW = h * 0.15;
+      ctx.beginPath();
+      if (isSupply) { ctx.moveTo(-arrLen/2, 0); ctx.lineTo(arrLen/2, 0); ctx.moveTo(arrLen/2 - arrLen*0.3, -arrW); ctx.lineTo(arrLen/2, 0); ctx.lineTo(arrLen/2 - arrLen*0.3, arrW); }
+      else { ctx.moveTo(arrLen/2, 0); ctx.lineTo(-arrLen/2, 0); ctx.moveTo(-arrLen/2 + arrLen*0.3, -arrW); ctx.lineTo(-arrLen/2, 0); ctx.lineTo(-arrLen/2 + arrLen*0.3, arrW); }
+      ctx.stroke();
+    } else if (el.kind === 'fan') {
+      ctx.fillStyle = fillColor; ctx.strokeStyle = strokeColor; ctx.lineWidth = 1.5;
+      const r = Math.min(w, h) / 2 * 0.9;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = isSel ? '#e74c3c' : '#3498db'; ctx.lineWidth = 2;
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI/2 + Math.PI/4; ctx.beginPath(); ctx.moveTo(Math.cos(a)*r*0.2, Math.sin(a)*r*0.2); ctx.lineTo(Math.cos(a)*r*0.9, Math.sin(a)*r*0.9); ctx.stroke(); }
+      ctx.fillStyle = isSel ? '#e74c3c' : '#2980b9'; ctx.beginPath(); ctx.arc(0, 0, r*0.15, 0, Math.PI*2); ctx.fill();
+    } else if (el.kind === 'silencer') {
+      ctx.fillStyle = fillColor; ctx.strokeStyle = strokeColor; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.rect(-w/2, -h/2, w, h); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = isSel ? '#e74c3c' : '#7f8c8d'; ctx.lineWidth = 1;
+      const zigCount = 5;
+      for (let i = 0; i < zigCount; i++) { const x = -w/2 + (w/(zigCount+1))*(i+1); ctx.beginPath(); ctx.moveTo(x, -h/4); ctx.lineTo(x - w*0.03, 0); ctx.lineTo(x, h/4); ctx.stroke(); }
+    } else if (el.kind === 'damper') {
+      ctx.fillStyle = fillColor; ctx.strokeStyle = strokeColor; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.rect(-w/2, -h/2, w, h); ctx.fill(); ctx.stroke();
+      const a = (el.openAngle || 45) * Math.PI / 180;
+      const bladeLen = Math.min(w, h) * 0.8;
+      ctx.strokeStyle = isSel ? '#e74c3c' : '#e67e22'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(-Math.cos(a)*bladeLen/2, -Math.sin(a)*bladeLen/2); ctx.lineTo(Math.cos(a)*bladeLen/2, Math.sin(a)*bladeLen/2); ctx.stroke();
+      ctx.fillStyle = isSel ? '#e74c3c' : '#7f8c8d'; ctx.beginPath(); ctx.arc(0, 0, 3*scale, 0, Math.PI*2); ctx.fill();
+    } else if (el.kind === 'custom') {
+      const symPath = el.symbolPath || [];
+      const symColor = el.symbolColor || '#9b59b6';
+      ctx.strokeStyle = isSel ? '#e74c3c' : symColor; ctx.lineWidth = 2;
+      symPath.forEach(function(cmd) {
+        const sx = cmd.x * w / 100, sy = cmd.y * h / 100;
+        if (cmd.type === 'line') {
+          const ex = cmd.x2 * w / 100, ey = cmd.y2 * h / 100;
+          ctx.beginPath(); ctx.moveTo(sx - w/2, sy - h/2); ctx.lineTo(ex - w/2, ey - h/2); ctx.stroke();
+        } else if (cmd.type === 'circle') {
+          const r = cmd.r * Math.min(w, h) / 100;
+          ctx.beginPath(); ctx.arc(sx - w/2, sy - h/2, r, 0, Math.PI*2); ctx.stroke();
+        } else if (cmd.type === 'arc') {
+          const r = cmd.r * Math.min(w, h) / 100;
+          ctx.beginPath(); ctx.arc(sx - w/2, sy - h/2, r, cmd.startAngle, cmd.endAngle, cmd.ccw); ctx.stroke();
+        }
+      });
+    }
+    ctx.restore();
+    ctx.fillStyle = '#2c3e50'; ctx.font = '10px Segoe UI'; ctx.textAlign = 'center';
+    ctx.fillText(el.name || el.kind, p.x, p.y + h/2 + 14);
+  }
+
+
+  function drawCenterMarker(wx, wy, color) {
+    const p = toScreen(wx, wy);
+    const s = Math.max(4, 6 / scale);
+    ctx.strokeStyle = color || '#e74c3c';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(p.x - s, p.y); ctx.lineTo(p.x + s, p.y);
+    ctx.moveTo(p.x, p.y - s); ctx.lineTo(p.x, p.y + s);
+    ctx.stroke();
+    ctx.fillStyle = color || '#e74c3c';
+    ctx.beginPath(); ctx.arc(p.x, p.y, Math.max(2, 2 / scale), 0, Math.PI*2); ctx.fill();
+  }
+
+  function drawVentJoints() {
+    const pointMap = {};
+    elements.filter(function(e) { return e.type === 'vent'; }).forEach(function(v) {
+      const key1 = v.x1 + ',' + v.y1, key2 = v.x2 + ',' + v.y2;
+      if (!pointMap[key1]) pointMap[key1] = [];
+      if (!pointMap[key2]) pointMap[key2] = [];
+      pointMap[key1].push({ vent: v, end: 'start', x: v.x1, y: v.y1 });
+      pointMap[key2].push({ vent: v, end: 'end', x: v.x2, y: v.y2 });
+    });
+    for (const key in pointMap) {
+      const connections = pointMap[key];
+      if (connections.length < 2) continue;
+      for (let i = 0; i < connections.length; i++) {
+        for (let j = i + 1; j < connections.length; j++) {
+          const c1 = connections[i], c2 = connections[j];
+          let dx1 = c1.end === 'start' ? c1.vent.x2 - c1.vent.x1 : c1.vent.x1 - c1.vent.x2;
+          let dy1 = c1.end === 'start' ? c1.vent.y2 - c1.vent.y1 : c1.vent.y1 - c1.vent.y2;
+          let dx2 = c2.end === 'start' ? c2.vent.x2 - c2.vent.x1 : c2.vent.x1 - c2.vent.x2;
+          let dy2 = c2.end === 'start' ? c2.vent.y2 - c2.vent.y1 : c2.vent.y1 - c2.vent.y2;
+          const len1 = Math.hypot(dx1, dy1), len2 = Math.hypot(dx2, dy2);
+          if (len1 === 0 || len2 === 0) continue;
+          dx1 /= len1; dy1 /= len1; dx2 /= len2; dy2 /= len2;
+          const dot = dx1*dx2 + dy1*dy2;
+          const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
+          if (angle < 0.05 || angle > Math.PI - 0.05) continue;
+          const n1a = { x: -dy1, y: dx1 }, n1b = { x: dy1, y: -dx1 };
+          const n2a = { x: -dy2, y: dx2 }, n2b = { x: dy2, y: -dx2 };
+          const isRect1 = c1.vent.shape === 'rect';
+          const isRect2 = c2.vent.shape === 'rect';
+          const w1 = isRect1 ? ((c1.vent.rectH || 100) / 25) : ((c1.end === 'start' ? c1.vent.diameter1 : c1.vent.diameter2 || c1.vent.diameter1) / 25);
+          const w2 = isRect2 ? ((c2.vent.rectH || 100) / 25) : ((c2.end === 'start' ? c2.vent.diameter1 : c2.vent.diameter2 || c2.vent.diameter1) / 25);
+          const r1 = w1 / 2, r2 = w2 / 2;
+          let bestPair = null, bestScore = -Infinity;
+          for (let ni = 0; ni < 2; ni++) {
+            const n1 = ni === 0 ? n1a : n1b;
+            for (let nj = 0; nj < 2; nj++) {
+              const n2 = nj === 0 ? n2a : n2b;
+              const p1x = c1.x + n1.x * r1, p1y = c1.y + n1.y * r1;
+              const p2x = c2.x + n2.x * r2, p2y = c2.y + n2.y * r2;
+              const mx = (p1x + p2x) / 2, my = (p1y + p2y) / 2;
+              const mdx = mx - c1.x, mdy = my - c1.y;
+              const mlen = Math.hypot(mdx, mdy);
+              if (mlen === 0) continue;
+              const mdxn = mdx / mlen, mdyn = mdy / mlen;
+              const bisx = -(dx1 + dx2), bisy = -(dy1 + dy2);
+              const bisLen = Math.hypot(bisx, bisy);
+              if (bisLen === 0) continue;
+              const score = (mdxn * bisx + mdyn * bisy) / bisLen;
+              if (score > bestScore) { bestScore = score; bestPair = { p1x: p1x, p1y: p1y, p2x: p2x, p2y: p2y }; }
+            }
+          }
+          if (!bestPair || bestScore < 0.1) continue;
+          const P = toScreen(c1.x, c1.y);
+          const a1 = Math.atan2(bestPair.p1y - c1.y, bestPair.p1x - c1.x);
+          const a2 = Math.atan2(bestPair.p2y - c1.y, bestPair.p2x - c1.x);
+          const cross = dx1 * dy2 - dy1 * dx2;
+          const counterClockwise = cross > 0;
+          const avgR = (r1 + r2) / 2;
+          const isSupply1 = (c1.vent.ventType || 'supply') === 'supply';
+          const color1 = c1.vent.id === selectedId ? '#e74c3c' : (isSupply1 ? '#3498db' : '#e91e63');
+          const strokeColor = c1.vent.id === selectedId ? '#c0392b' : (isSupply1 ? '#2980b9' : '#c2185b');
+          ctx.fillStyle = color1;
+          ctx.beginPath(); ctx.moveTo(P.x, P.y);
+          const p1s = toScreen(bestPair.p1x, bestPair.p1y);
+          ctx.lineTo(p1s.x, p1s.y);
+          ctx.arc(P.x, P.y, avgR * scale, a1, a2, counterClockwise);
+          ctx.closePath(); ctx.fill();
+          ctx.strokeStyle = strokeColor; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(P.x, P.y, avgR * scale, a1, a2, counterClockwise); ctx.stroke();
+        }
+      }
+    }
+  }
+
+  function drawTempHint(label, sublabel) {
+    if (!tempShape || tempShape.type === 'custom_draw') return;
+    const p2 = toScreen(tempShape.x2, tempShape.y2);
+    const dx = tempShape.x2 - tempShape.x1, dy = tempShape.y2 - tempShape.y1;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.font = '12px Segoe UI';
+    const text = len.toFixed(0) + ' мм | ' + angle.toFixed(0) + '°';
+    const text2 = sublabel || 'Enter — точна довжина';
+    const tw = Math.max(ctx.measureText(text).width, ctx.measureText(text2).width) + 16;
+    const th = 44, hx = p2.x + 14, hy = p2.y - 14, rr = 6;
+    ctx.beginPath();
+    ctx.moveTo(hx + rr, hy - th); ctx.lineTo(hx + tw - rr, hy - th);
+    ctx.quadraticCurveTo(hx + tw, hy - th, hx + tw, hy - th + rr); ctx.lineTo(hx + tw, hy - rr);
+    ctx.quadraticCurveTo(hx + tw, hy, hx + tw - rr, hy); ctx.lineTo(hx + rr, hy);
+    ctx.quadraticCurveTo(hx, hy, hx, hy - rr); ctx.lineTo(hx, hy - th + rr);
+    ctx.quadraticCurveTo(hx, hy - th, hx + rr, hy - th); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, hx + 8, hy - th + 14);
+    ctx.fillStyle = '#f1c40f';
+    ctx.fillText(text2, hx + 8, hy - th + 30);
+  }
+
+  function drawCallout(el, isTemp) {
+    const p1 = toScreen(el.x1, el.y1);
+    const p2 = toScreen(el.x2, el.y2);
+    const isSel = el.id === selectedId;
+    ctx.strokeStyle = isSel ? '#e74c3c' : '#2c3e50';
+    ctx.lineWidth = isTemp ? 1 : 1.5;
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    // Arrow at start
+    const angle = Math.atan2(p1.y - p2.y, p1.x - p2.x);
+    const arrowLen = 8 * scale, arrowW = 4 * scale;
+    ctx.fillStyle = isSel ? '#e74c3c' : '#2c3e50';
+    ctx.beginPath();
+    ctx.moveTo(p1.x, p1.y);
+    ctx.lineTo(p1.x + Math.cos(angle + 0.4)*arrowLen, p1.y + Math.sin(angle + 0.4)*arrowLen);
+    ctx.lineTo(p1.x + Math.cos(angle - 0.4)*arrowLen, p1.y + Math.sin(angle - 0.4)*arrowLen);
+    ctx.closePath(); ctx.fill();
+    // Text box
+    const text = el.text || '';
+    ctx.font = (isTemp ? '12px' : (el.fontSize || 12) + 'px') + ' Segoe UI';
+    const tw = ctx.measureText(text).width + 12;
+    const th = 22;
+    const bx = p2.x - tw/2, by = p2.y - th/2;
+    ctx.fillStyle = isSel ? 'rgba(231,76,60,0.1)' : 'rgba(255,255,255,0.95)';
+    ctx.strokeStyle = isSel ? '#e74c3c' : '#2c3e50';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(bx + 4, by); ctx.lineTo(bx + tw - 4, by);
+    ctx.quadraticCurveTo(bx + tw, by, bx + tw, by + 4); ctx.lineTo(bx + tw, by + th - 4);
+    ctx.quadraticCurveTo(bx + tw, by + th, bx + tw - 4, by + th); ctx.lineTo(bx + 4, by + th);
+    ctx.quadraticCurveTo(bx, by + th, bx, by + th - 4); ctx.lineTo(bx, by + 4);
+    ctx.quadraticCurveTo(bx, by, bx + 4, by); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = isSel ? '#e74c3c' : '#2c3e50';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(text, p2.x, p2.y);
+  }
+
+  function getDrawingBounds() {
+    if (!elements || elements.length === 0) return null;
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    elements.forEach(function(el) {
+        var x = el.x || 0, y = el.y || 0;
+        var w = (el.width || 60) * 2, h = (el.height || 60) * 2;
+        minX = Math.min(minX, x - w);
+        minY = Math.min(minY, y - h);
+        maxX = Math.max(maxX, x + w);
+        maxY = Math.max(maxY, y + h);
+    });
+    return { minX: minX, minY: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function draw() {
+    const dpr = window.devicePixelRatio || 1;
+    const cssW = canvas.width / dpr;
+    const cssH = canvas.height / dpr;
+    ctx.clearRect(0, 0, cssW, cssH);
+    drawGrid();
+    elements.forEach(function(el) {
+      if (el.type === 'wall') drawWall(el);
+      else if (el.type === 'window') drawWindow(el);
+      else if (el.type === 'door') drawDoor(el);
+      else if (el.type === 'vent') drawVent(el);
+      else if (el.type === 'dimension') drawDimension(el);
+      else if (el.type === 'vent_equip') drawVentEquip(el);
+      else if (el.type === 'callout') drawCallout(el, false);
+    });
+    drawVentJoints();
+    if (tempShape) {
+      if (tempShape.type === 'wall') drawWall(tempShape);
+      else if (tempShape.type === 'vent') drawVent(tempShape);
+      else if (tempShape.type === 'dimension') drawDimension(tempShape);
+      else if (tempShape.type === 'callout') { drawCallout(tempShape, true); }
+      else if (tempShape.type === 'vent_equip') { drawVentEquip(tempShape); }
+      else if (tempShape.type === 'custom_draw') {
+        const p1 = toScreen(tempShape.x1, tempShape.y1);
+        const p2 = toScreen(tempShape.x2, tempShape.y2);
+        ctx.fillStyle = 'rgba(155,89,182,0.15)'; ctx.strokeStyle = '#9b59b6'; ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 5]);
+        ctx.beginPath();
+        ctx.rect(Math.min(p1.x, p2.x), Math.min(p1.y, p2.y), Math.abs(p2.x - p1.x), Math.abs(p2.y - p1.y));
+        ctx.fill(); ctx.stroke(); ctx.setLineDash([]);
+        const ww = Math.abs(tempShape.x2 - tempShape.x1), hh = Math.abs(tempShape.y2 - tempShape.y1);
+        ctx.fillStyle = '#000'; ctx.font = '11px Segoe UI'; ctx.textAlign = 'center';
+        ctx.fillText(ww.toFixed(0) + '×' + hh.toFixed(0), (p1.x + p2.x)/2, Math.min(p1.y, p2.y) - 6);
+      }
+      drawTempHint();
+    }
+    // Center marker for temp shape (vent equip or custom draw)
+    if (tempShape && (tempShape.type === 'vent_equip' || tempShape.type === 'custom_draw')) {
+      const cx = tempShape.type === 'custom_draw' ? (tempShape.x1 + tempShape.x2)/2 : tempShape.x;
+      const cy = tempShape.type === 'custom_draw' ? (tempShape.y1 + tempShape.y2)/2 : tempShape.y;
+      drawCenterMarker(cx, cy, '#9b59b6');
+    }
+    // Center marker for selected element
+    if (selectedId) {
+      const sel = elements.find(function(e) { return e.id === selectedId; });
+      if (sel) {
+        if (sel.type === 'wall' || sel.type === 'vent' || sel.type === 'dimension') {
+          drawCenterMarker((sel.x1 + sel.x2)/2, (sel.y1 + sel.y2)/2, '#e74c3c');
+        } else if (sel.type === 'window' || sel.type === 'door' || sel.type === 'vent_equip') {
+          drawCenterMarker(sel.x, sel.y, '#e74c3c');
+        } else if (sel.type === 'callout') {
+          drawCenterMarker(sel.x2, sel.y2, '#e74c3c');
+        }
+      }
+    }
+    drawSnapIndicator();
+    updateVentList();
+  }
+
+  // ===== SYMBOL EDITOR =====
+  const symOverlay = document.getElementById('sym-overlay');
+  const symCanvas = document.getElementById('sym-canvas');
+  const symCtx = symCanvas.getContext('2d');
+  let symPath = [];
+  let symTool = 'select';
+  let symTemp = null;
+  let symPhase = 0;
+  let symSelectedIdx = -1;
+
+  function openSymbolEditor(path, color, callback) {
+    symPath = path ? JSON.parse(JSON.stringify(path)) : [];
+    symTool = 'select';
+    symTemp = null;
+    symPhase = 0;
+    symSelectedIdx = -1;
+    symbolEditorCallback = callback;
+    symOverlay.classList.add('visible');
+    document.querySelectorAll('.symtool').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelector('.symtool[data-symtool="select"]').classList.add('active');
+    drawSymCanvas();
+  }
+
+  function closeSymbolEditor(save) {
+    symOverlay.classList.remove('visible');
+    if (save && symbolEditorCallback) {
+      symbolEditorCallback(symPath);
+    }
+    symbolEditorCallback = null;
+    symbolEditorTarget = null;
+  }
+
+  function drawSymGrid() {
+    symCtx.strokeStyle = '#e0e0e0'; symCtx.lineWidth = 0.5;
+    for (let x = 0; x <= 400; x += 20) { symCtx.beginPath(); symCtx.moveTo(x, 0); symCtx.lineTo(x, 400); symCtx.stroke(); }
+    for (let y = 0; y <= 400; y += 20) { symCtx.beginPath(); symCtx.moveTo(0, y); symCtx.lineTo(400, y); symCtx.stroke(); }
+    symCtx.strokeStyle = '#c0c0c0'; symCtx.lineWidth = 0.8;
+    for (let x = 0; x <= 400; x += 100) { symCtx.beginPath(); symCtx.moveTo(x, 0); symCtx.lineTo(x, 400); symCtx.stroke(); }
+    for (let y = 0; y <= 400; y += 100) { symCtx.beginPath(); symCtx.moveTo(0, y); symCtx.lineTo(400, y); symCtx.stroke(); }
+  }
+
+  function drawSymPath() {
+    symCtx.strokeStyle = '#2c3e50'; symCtx.lineWidth = 2;
+    symPath.forEach(function(cmd, idx) {
+      const isSel = idx === symSelectedIdx;
+      symCtx.strokeStyle = isSel ? '#e74c3c' : '#2c3e50';
+      symCtx.lineWidth = isSel ? 3 : 2;
+      if (cmd.type === 'line') {
+        symCtx.beginPath(); symCtx.moveTo(cmd.x * 4, cmd.y * 4); symCtx.lineTo(cmd.x2 * 4, cmd.y2 * 4); symCtx.stroke();
+      } else if (cmd.type === 'circle') {
+        symCtx.beginPath(); symCtx.arc(cmd.x * 4, cmd.y * 4, cmd.r * 4, 0, Math.PI*2); symCtx.stroke();
+      } else if (cmd.type === 'arc') {
+        symCtx.beginPath(); symCtx.arc(cmd.x * 4, cmd.y * 4, cmd.r * 4, cmd.startAngle, cmd.endAngle, cmd.ccw); symCtx.stroke();
+      }
+    });
+  }
+
+  function drawSymTemp() {
+    if (!symTemp) return;
+    symCtx.strokeStyle = '#9b59b6'; symCtx.lineWidth = 2; symCtx.setLineDash([6, 4]);
+    if (symTemp.type === 'line') {
+      symCtx.beginPath(); symCtx.moveTo(symTemp.x * 4, symTemp.y * 4); symCtx.lineTo(symTemp.x2 * 4, symTemp.y2 * 4); symCtx.stroke();
+    } else if (symTemp.type === 'circle') {
+      symCtx.beginPath(); symCtx.arc(symTemp.x * 4, symTemp.y * 4, symTemp.r * 4, 0, Math.PI*2); symCtx.stroke();
+    } else if (symTemp.type === 'arc') {
+      if (symPhase >= 1) {
+        symCtx.beginPath(); symCtx.arc(symTemp.x * 4, symTemp.y * 4, symTemp.r * 4, 0, Math.PI*2); symCtx.stroke();
+      }
+      if (symPhase >= 2 && symTemp.startAngle !== undefined) {
+        symCtx.beginPath(); symCtx.arc(symTemp.x * 4, symTemp.y * 4, symTemp.r * 4, symTemp.startAngle, symTemp.endAngle || symTemp.startAngle, false); symCtx.stroke();
+      }
+    }
+    symCtx.setLineDash([]);
+  }
+
+  function drawSymCanvas() {
+    symCtx.clearRect(0, 0, 400, 400);
+    drawSymGrid();
+    drawSymPath();
+    drawSymTemp();
+  }
+
+  function norm(v) { return v / 4; }
+
+  function symHitTest(mx, my) {
+    for (let i = symPath.length - 1; i >= 0; i--) {
+      const cmd = symPath[i];
+      if (cmd.type === 'line') {
+        const d = pointToSegmentDist(mx, my, cmd.x * 4, cmd.y * 4, cmd.x2 * 4, cmd.y2 * 4);
+        if (d < 8) return i;
+      } else if (cmd.type === 'circle') {
+        const d = Math.hypot(mx - cmd.x * 4, my - cmd.y * 4) - cmd.r * 4;
+        if (Math.abs(d) < 8) return i;
+      } else if (cmd.type === 'arc') {
+        const dx = mx - cmd.x * 4, dy = my - cmd.y * 4;
+        const d = Math.hypot(dx, dy) - cmd.r * 4;
+        const ang = Math.atan2(dy, dx);
+        let a = ang, s = cmd.startAngle, e = cmd.endAngle;
+        while (a < s) a += Math.PI*2; while (a > e && !cmd.ccw) a -= Math.PI*2;
+        if (Math.abs(d) < 10 && ((cmd.ccw && a >= e && a <= s) || (!cmd.ccw && a >= s && a <= e))) return i;
+      }
+    }
+    return -1;
+  }
+
+  symCanvas.addEventListener('mousedown', function(e) {
+    const rect = symCanvas.getBoundingClientRect();
+    const scaleX = symCanvas.width / rect.width;
+    const scaleY = symCanvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+    if (symTool === 'select' || symTool === 'delete') {
+      const idx = symHitTest(mx, my);
+      if (idx >= 0) {
+        symSelectedIdx = idx;
+        if (symTool === 'delete') { symPath.splice(idx, 1); symSelectedIdx = -1; }
+        drawSymCanvas();
+      } else {
+        symSelectedIdx = -1; drawSymCanvas();
+      }
+      return;
+    }
+    if (symTool === 'line') {
+      if (!symTemp) {
+        symTemp = { type: 'line', x: norm(mx), y: norm(my), x2: norm(mx), y2: norm(my) };
+      } else {
+        symPath.push({ type: 'line', x: symTemp.x, y: symTemp.y, x2: norm(mx), y2: norm(my) });
+        symTemp = null;
+        drawSymCanvas();
+      }
+      return;
+    }
+    if (symTool === 'circle') {
+      if (!symTemp) {
+        symTemp = { type: 'circle', x: norm(mx), y: norm(my), r: 0 };
+      } else {
+        symPath.push({ type: 'circle', x: symTemp.x, y: symTemp.y, r: symTemp.r });
+        symTemp = null;
+        drawSymCanvas();
+      }
+      return;
+    }
+    if (symTool === 'arc') {
+      if (symPhase === 0) {
+        symTemp = { type: 'arc', x: norm(mx), y: norm(my), r: 0 };
+        symPhase = 1;
+      } else if (symPhase === 1) {
+        symTemp.r = Math.hypot(mx - symTemp.x * 4, my - symTemp.y * 4) / 4;
+        symTemp.startAngle = Math.atan2(my - symTemp.y * 4, mx - symTemp.x * 4);
+        symPhase = 2;
+      } else if (symPhase === 2) {
+        symTemp.endAngle = Math.atan2(my - symTemp.y * 4, mx - symTemp.x * 4);
+        symTemp.ccw = false;
+        symPath.push({ type: 'arc', x: symTemp.x, y: symTemp.y, r: symTemp.r, startAngle: symTemp.startAngle, endAngle: symTemp.endAngle, ccw: symTemp.ccw });
+        symTemp = null; symPhase = 0;
+        drawSymCanvas();
+      }
+      return;
+    }
+  });
+
+  symCanvas.addEventListener('mousemove', function(e) {
+    const rect = symCanvas.getBoundingClientRect();
+    const scaleX = symCanvas.width / rect.width;
+    const scaleY = symCanvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+    if (symTool === 'select') {
+      const hitIdx = symHitTest(mx, my);
+      symCanvas.style.cursor = hitIdx >= 0 ? 'pointer' : 'default';
+      // Show radius tooltip for circles/arcs
+      if (hitIdx >= 0) {
+        const cmd = symPath[hitIdx];
+        if (cmd.type === 'circle' || cmd.type === 'arc') {
+          drawSymCanvas();
+          symCtx.fillStyle = 'rgba(0,0,0,0.75)';
+          symCtx.font = '12px Segoe UI';
+          const txt = 'r = ' + cmd.r.toFixed(1) + ' (d = ' + (cmd.r * 2).toFixed(1) + ')';
+          const tw = symCtx.measureText(txt).width + 12;
+          const tx = mx + 10, ty = my - 10;
+          symCtx.fillRect(tx, ty - 14, tw, 20);
+          symCtx.fillStyle = '#fff';
+          symCtx.textAlign = 'left';
+          symCtx.textBaseline = 'middle';
+          symCtx.fillText(txt, tx + 6, ty - 4);
+        }
+      }
+    } else {
+      symCanvas.style.cursor = 'crosshair';
+    }
+    if (!symTemp) return;
+    if (symTemp.type === 'line') {
+      symTemp.x2 = norm(mx); symTemp.y2 = norm(my);
+    } else if (symTemp.type === 'circle') {
+      symTemp.r = Math.hypot(mx - symTemp.x * 4, my - symTemp.y * 4) / 4;
+    } else if (symTemp.type === 'arc') {
+      if (symPhase === 1) {
+        symTemp.r = Math.hypot(mx - symTemp.x * 4, my - symTemp.y * 4) / 4;
+      } else if (symPhase === 2) {
+        symTemp.endAngle = Math.atan2(my - symTemp.y * 4, mx - symTemp.x * 4);
+      }
+    }
+    drawSymCanvas();
+  });
+
+  symCanvas.addEventListener('mouseleave', function() { symTemp = null; symPhase = 0; drawSymCanvas(); });
+
+  document.querySelectorAll('.symtool').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.symtool').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      symTool = btn.dataset.symtool;
+      symTemp = null; symPhase = 0; symSelectedIdx = -1;
+      drawSymCanvas();
+    });
+  });
+
+  document.getElementById('sym-clear').addEventListener('click', function() {
+    symPath = []; symTemp = null; symPhase = 0; symSelectedIdx = -1; drawSymCanvas();
+  });
+  document.getElementById('sym-cancel').addEventListener('click', function() { closeSymbolEditor(false); });
+  document.getElementById('sym-done').addEventListener('click', function() { closeSymbolEditor(true); });
+
+
+  function dist(x1, y1, x2, y2) {
+    return Math.hypot(x2 - x1, y2 - y1);
+  }
+
+  function findConnectedBranch(startEl, tolerance) {
+    tolerance = tolerance || 8;
+    if (!startEl || (startEl.type !== 'vent' && startEl.type !== 'vent_equip')) return [startEl];
+    const branch = [];
+    const visited = new Set();
+    const queue = [startEl];
+    visited.add(startEl.id);
+    while (queue.length > 0) {
+      const curr = queue.shift();
+      branch.push(curr);
+      elements.forEach(function(el) {
+        if (el.id === curr.id || visited.has(el.id)) return;
+        if (el.type !== 'vent' && el.type !== 'vent_equip') return;
+        let connected = false;
+        if (curr.type === 'vent' && el.type === 'vent') {
+          if (dist(curr.x1, curr.y1, el.x1, el.y1) < tolerance || dist(curr.x1, curr.y1, el.x2, el.y2) < tolerance ||
+              dist(curr.x2, curr.y2, el.x1, el.y1) < tolerance || dist(curr.x2, curr.y2, el.x2, el.y2) < tolerance) {
+            connected = true;
+          }
+        } else if (curr.type === 'vent' && el.type === 'vent_equip') {
+          if (dist(curr.x1, curr.y1, el.x, el.y) < tolerance || dist(curr.x2, curr.y2, el.x, el.y) < tolerance ||
+              dist((curr.x1+curr.x2)/2, (curr.y1+curr.y2)/2, el.x, el.y) < tolerance) {
+            connected = true;
+          }
+          if (!connected) {
+            const d = pointToSegmentDist(el.x, el.y, curr.x1, curr.y1, curr.x2, curr.y2);
+            if (d < tolerance) connected = true;
+          }
+        } else if (curr.type === 'vent_equip' && el.type === 'vent') {
+          if (dist(el.x1, el.y1, curr.x, curr.y) < tolerance || dist(el.x2, el.y2, curr.x, curr.y) < tolerance ||
+              dist((el.x1+el.x2)/2, (el.y1+el.y2)/2, curr.x, curr.y) < tolerance) {
+            connected = true;
+          }
+          if (!connected) {
+            const d = pointToSegmentDist(curr.x, curr.y, el.x1, el.y1, el.x2, el.y2);
+            if (d < tolerance) connected = true;
+          }
+        } else if (curr.type === 'vent_equip' && el.type === 'vent_equip') {
+          if (dist(curr.x, curr.y, el.x, el.y) < tolerance) connected = true;
+        }
+        if (connected) {
+          visited.add(el.id);
+          queue.push(el);
+        }
+      });
+    }
+    return branch;
+  }
+
+  function updateProps() {
+    if (!selectedId) { propContent.innerHTML = 'Нічого не вибрано'; return; }
+    const el = elements.find(function(e) { return e.id === selectedId; });
+    if (!el) { selectedId = null; propContent.innerHTML = 'Нічого не вибрано'; return; }
+
+    let html = '<div class="prop-row"><span class="prop-label">Тип:</span><span class="prop-value">' + el.type + '</span></div>';
+    html += '<div class="prop-row"><span class="prop-label">ID:</span><span class="prop-value">#' + el.id + '</span></div>';
+
+    if (el.name !== undefined) {
+      html += '<div class="prop-row"><span class="prop-label">Назва:</span></div>';
+      html += '<input class="prop-input" id="prop-name" value="' + (el.name || '') + '" placeholder="Назва елемента">';
+    }
+
+    if (el.type === 'wall') {
+      const len = Math.sqrt((el.x2-el.x1)*(el.x2-el.x1) + (el.y2-el.y1)*(el.y2-el.y1));
+      html += '<div class="prop-row"><span class="prop-label">Довжина (мм):</span></div>';
+      html += '<input class="prop-input" id="prop-length" type="number" value="' + len.toFixed(0) + '">';
+      html += '<div class="prop-row"><span class="prop-label">Товщина (мм):</span></div>';
+      html += '<input class="prop-input" id="prop-thickness" type="number" value="' + (el.thickness || 6) + '">';
+    }
+    if (el.type === 'window') {
+      html += '<div class="prop-row"><span class="prop-label">Ширина (мм):</span></div>';
+      html += '<input class="prop-input" id="prop-width" type="number" value="' + (el.width || 60) + '">';
+      html += '<div class="prop-row"><span class="prop-label">Висота (мм):</span></div>';
+      html += '<input class="prop-input" id="prop-height" type="number" value="' + (el.height || 8) + '">';
+      html += '<div class="prop-row"><span class="prop-label">Поворот (°):</span></div>';
+      html += '<input class="prop-input" id="prop-rotation" type="number" value="' + (el.rotation || 0) + '">';
+    }
+    if (el.type === 'door') {
+      html += '<div class="prop-row"><span class="prop-label">Ширина (мм):</span></div>';
+      html += '<input class="prop-input" id="prop-width" type="number" value="' + (el.width || 40) + '">';
+      html += '<div class="prop-row"><span class="prop-label">Висота (мм):</span></div>';
+      html += '<input class="prop-input" id="prop-height" type="number" value="' + (el.height || 6) + '">';
+      html += '<div class="prop-row"><span class="prop-label">Поворот (°):</span></div>';
+      html += '<input class="prop-input" id="prop-rotation" type="number" value="' + (el.rotation || 0) + '">';
+      html += '<div class="prop-row"><span class="prop-label">Сторона петель:</span></div>';
+      html += '<select class="prop-input" id="prop-swing"><option value="right" ' + ((el.swing||'right')==='right'?'selected':'') + '>Праві →</option><option value="left" ' + ((el.swing||'right')==='left'?'selected':'') + '>Ліві ←</option></select>';
+      html += '<div class="prop-row"><span class="prop-label">Напрямок відкривання:</span></div>';
+      html += '<select class="prop-input" id="prop-direction"><option value="forward" ' + ((el.direction||'forward')==='forward'?'selected':'') + '>Вперед (назовні)</option><option value="backward" ' + ((el.direction||'forward')==='backward'?'selected':'') + '>Назад (всередину)</option></select>';
+    }
+    if (el.type === 'vent') {
+      html += '<div class="prop-row"><span class="prop-label">Назва:</span></div>';
+      html += '<input class="prop-input" id="prop-name" value="' + (el.name || '') + '" placeholder="Назва елемента">';
+      const len = Math.sqrt((el.x2-el.x1)*(el.x2-el.x1) + (el.y2-el.y1)*(el.y2-el.y1));
+      html += '<div class="prop-row"><span class="prop-label">Довжина (мм):</span></div>';
+      html += '<input class="prop-input" id="prop-length" type="number" value="' + len.toFixed(0) + '">';
+      html += '<div class="prop-row"><span class="prop-label">Тип вентиляції:</span></div>';
+      html += '<select class="prop-input" id="prop-ventType"><option value="supply" ' + ((el.ventType||'supply')==='supply'?'selected':'') + '>🟦 Припливна</option><option value="exhaust" ' + ((el.ventType||'supply')==='exhaust'?'selected':'') + '>🟥 Витяжна</option></select>';
+      if (el.shape === 'rect') {
+        html += '<div class="prop-row"><span class="prop-label">Ширина (мм):</span></div>';
+        html += '<input class="prop-input" id="prop-rectW" type="number" value="' + (el.rectW || 160) + '">';
+        html += '<div class="prop-row"><span class="prop-label">Висота (мм):</span></div>';
+        html += '<input class="prop-input" id="prop-rectH" type="number" value="' + (el.rectH || 100) + '">';
+      } else {
+        html += '<div class="prop-row"><span class="prop-label">Діаметр початку (мм):</span></div>';
+        html += '<input class="prop-input" id="prop-diameter1" type="number" value="' + (el.diameter1 || 160) + '">';
+        html += '<div class="prop-row"><span class="prop-label">Діаметр кінця (мм):</span></div>';
+        html += '<input class="prop-input" id="prop-diameter2" type="number" value="' + (el.diameter2 || el.diameter1 || 160) + '">';
+        html += '<div class="prop-row"><span class="prop-label">Витрата повітря (м³/год):</span></div>';
+        html += '<input class="prop-input" id="prop-airflow" type="number" value="' + (el.airflow || 100) + '">';
+      }
+      html += '<div class="prop-row"><span class="prop-label">Система:</span></div>';
+      html += '<input class="prop-input" id="prop-system" value="' + (el.system || 'П1') + '">';
+    }
+    if (el.type === 'dimension') {
+      const len = Math.sqrt((el.x2-el.x1)*(el.x2-el.x1) + (el.y2-el.y1)*(el.y2-el.y1));
+      html += '<div class="prop-row"><span class="prop-label">Відстань:</span><span class="prop-value">' + len.toFixed(0) + ' мм</span></div>';
+      html += '<div class="prop-row"><span class="prop-label">Зміщення (мм):</span></div>';
+      html += '<input class="prop-input" id="prop-offset" type="number" value="' + (el.offset || 30) + '">';
+    }
+    if (el.type === 'callout') {
+      html += '<div class="prop-row"><span class="prop-label">Текст:</span></div>';
+      html += '<input class="prop-input" id="prop-text" value="' + (el.text || '') + '">';
+      html += '<div class="prop-row"><span class="prop-label">Розмір шрифту:</span></div>';
+      html += '<input class="prop-input" id="prop-fontSize" type="number" value="' + (el.fontSize || 12) + '">';
+    }
+    if (el.type === 'vent_equip') {
+      html += '<div class="prop-row"><span class="prop-label">Тип обладнання:</span><span class="prop-value">' + el.kind + '</span></div>';
+      html += '<div class="prop-row"><span class="prop-label">Назва:</span></div>';
+      html += '<input class="prop-input" id="prop-name" value="' + (el.name || '') + '">';
+      html += '<div class="prop-row"><span class="prop-label">Ширина (мм):</span></div>';
+      html += '<input class="prop-input" id="prop-width" type="number" value="' + (el.width || 60) + '">';
+      html += '<div class="prop-row"><span class="prop-label">Висота (мм):</span></div>';
+      html += '<input class="prop-input" id="prop-height" type="number" value="' + (el.height || 40) + '">';
+      html += '<div class="prop-row"><span class="prop-label">Поворот (°):</span></div>';
+      html += '<input class="prop-input" id="prop-rotation" type="number" value="' + (el.rotation || 0) + '">';
+      html += '<div class="prop-row"><span class="prop-label">Система:</span></div>';
+      html += '<input class="prop-input" id="prop-system" value="' + (el.system || 'П1') + '">';
+      html += '<div class="prop-row"><span class="prop-label">Витрата повітря (м³/год):</span></div>';
+      html += '<input class="prop-input" id="prop-airflow" type="number" value="' + (el.airflow || 100) + '">';
+      if (el.kind === 'grille') {
+        html += '<div class="prop-row"><span class="prop-label">Тип:</span></div>';
+        html += '<select class="prop-input" id="prop-ventType"><option value="supply" ' + ((el.ventType||'supply')==='supply'?'selected':'') + '>🟦 Припливна</option><option value="exhaust" ' + ((el.ventType||'supply')==='exhaust'?'selected':'') + '>🟥 Витяжна</option></select>';
+      }
+      if (el.kind === 'fan') {
+        html += '<div class="prop-row"><span class="prop-label">Потужність (Вт):</span></div>';
+        html += '<input class="prop-input" id="prop-power" type="number" value="' + (el.power || 100) + '">';
+      }
+      if (el.kind === 'damper') {
+        html += '<div class="prop-row"><span class="prop-label">Кут відкриття (°):</span></div>';
+        html += '<input class="prop-input" id="prop-openAngle" type="number" value="' + (el.openAngle || 45) + '">';
+      }
+      if (el.kind === 'custom') {
+        html += '<div class="prop-row"><span class="prop-label">Колір символу:</span></div>';
+        html += '<input class="prop-input" id="prop-symColor" value="' + (el.symbolColor || '#9b59b6') + '">';
+        html += '<button class="prop-btn" id="prop-edit-sym" style="background:#9b59b6;margin-top:6px;">🎨 Редагувати символ</button>';
+      }
+    }
+
+    html += '<button class="prop-btn" id="prop-save">💾 Застосувати зміни</button>';
+    html += '<button class="prop-btn" id="prop-close" style="background:#95a5a6;margin-top:6px;">✅ Завершити</button>';
+    html += '<button class="prop-btn delete" id="prop-delete">🗑️ Видалити елемент</button>';
+    propContent.innerHTML = html;
+
+    document.getElementById('prop-save').addEventListener('click', function() {
+      saveState();
+      const nameInput = document.getElementById('prop-name');
+      const lengthInput = document.getElementById('prop-length');
+      const thickInput = document.getElementById('prop-thickness');
+      const widthInput = document.getElementById('prop-width');
+      const heightInput = document.getElementById('prop-height');
+      const rotInput = document.getElementById('prop-rotation');
+      const swingInput = document.getElementById('prop-swing');
+      const directionInput = document.getElementById('prop-direction');
+      const ventTypeInput = document.getElementById('prop-ventType');
+      const diam1Input = document.getElementById('prop-diameter1');
+      const diam2Input = document.getElementById('prop-diameter2');
+      const airflowInput = document.getElementById('prop-airflow');
+      const systemInput = document.getElementById('prop-system');
+      const powerInput = document.getElementById('prop-power');
+      const openAngleInput = document.getElementById('prop-openAngle');
+      const symColorInput = document.getElementById('prop-symColor');
+
+      if (nameInput) el.name = nameInput.value;
+      if (lengthInput && (el.type === 'wall' || el.type === 'vent')) {
+        const newLen = parseFloat(lengthInput.value);
+        if (!isNaN(newLen) && newLen > 0) {
+          const angle = Math.atan2(el.y2 - el.y1, el.x2 - el.x1);
+          el.x2 = snap(el.x1 + newLen * Math.cos(angle));
+          el.y2 = snap(el.y1 + newLen * Math.sin(angle));
+        }
+      }
+      if (thickInput) { const v = parseFloat(thickInput.value); if (!isNaN(v)) el.thickness = v; }
+      if (widthInput) { const v = parseFloat(widthInput.value); if (!isNaN(v)) el.width = v; }
+      if (heightInput) { const v = parseFloat(heightInput.value); if (!isNaN(v)) el.height = v; }
+      if (rotInput) { const v = parseFloat(rotInput.value); if (!isNaN(v)) el.rotation = v; }
+      if (swingInput) el.swing = swingInput.value;
+      if (directionInput) el.direction = directionInput.value;
+      if (ventTypeInput) {
+        const oldType = el.ventType;
+        el.ventType = ventTypeInput.value;
+        if (oldType !== el.ventType && (el.type === 'vent' || el.type === 'vent_equip')) {
+          const branch = findConnectedBranch(el, 8);
+          branch.forEach(function(b) { if (b.ventType !== undefined) b.ventType = el.ventType; });
+        }
+      }
+      if (diam1Input) { const v = parseFloat(diam1Input.value); if (!isNaN(v)) el.diameter1 = v; }
+      if (diam2Input) { const v = parseFloat(diam2Input.value); if (!isNaN(v)) el.diameter2 = v; }
+      if (airflowInput) { const v = parseFloat(airflowInput.value); if (!isNaN(v)) el.airflow = v; }
+      const rectWInput = document.getElementById('prop-rectW');
+      const rectHInput = document.getElementById('prop-rectH');
+      if (rectWInput) { const v = parseFloat(rectWInput.value); if (!isNaN(v) && v > 0) el.rectW = v; }
+      if (rectHInput) { const v = parseFloat(rectHInput.value); if (!isNaN(v) && v > 0) el.rectH = v; }
+      if (systemInput) el.system = systemInput.value;
+      if (powerInput) { const v = parseFloat(powerInput.value); if (!isNaN(v)) el.power = v; }
+      if (openAngleInput) { const v = parseFloat(openAngleInput.value); if (!isNaN(v)) el.openAngle = v; }
+      if (symColorInput) el.symbolColor = symColorInput.value;
+      const textInput = document.getElementById('prop-text');
+      const fontSizeInput = document.getElementById('prop-fontSize');
+      if (textInput) el.text = textInput.value;
+      if (fontSizeInput) { const v = parseFloat(fontSizeInput.value); if (!isNaN(v)) el.fontSize = v; }
+      const offsetInput = document.getElementById('prop-offset');
+      if (offsetInput) { const v = parseFloat(offsetInput.value); if (!isNaN(v)) el.offset = v; }
+
+      selectedId = null;
+      updateProps();
+      draw();
+    });
+
+    document.getElementById('prop-delete').addEventListener('click', function() {
+      saveState();
+      elements = elements.filter(function(e) { return e.id !== selectedId; });
+      selectedId = null; updateProps(); draw();
+    });
+    document.getElementById('prop-close').addEventListener('click', function() {
+      selectedId = null;
+      updateProps();
+      draw();
+    });
+
+    const editSymBtn = document.getElementById('prop-edit-sym');
+    if (editSymBtn) {
+      editSymBtn.addEventListener('click', function() {
+        symbolEditorTarget = el;
+        openSymbolEditor(el.symbolPath, el.symbolColor, function(newPath) {
+          if (symbolEditorTarget) {
+            saveState();
+            symbolEditorTarget.symbolPath = newPath;
+            // Also update the template if it exists
+            const tpl = customTemplates.find(function(t) { return t.name === symbolEditorTarget.name.split(' ')[0]; });
+            if (tpl) { tpl.symbolPath = JSON.parse(JSON.stringify(newPath)); saveTemplatesToStorage(); }
+            draw();
+          }
+        });
+      });
+    }
+  }
+
+  function renderCustomButtons() {
+    const container = document.getElementById('custom-templates');
+    if (!container) return;
+    if (customTemplates.length === 0) { container.style.display = 'none'; container.innerHTML = ''; return; }
+    container.style.display = 'block';
+    let html = '<div class="vent-list-header" style="color:#95a5a6;font-size:11px;padding:4px 8px;text-transform:uppercase;">Мої елементи</div>';
+    customTemplates.forEach(function(t) {
+      html += '<div style="display:flex;gap:4px;align-items:center;"><button data-template="' + t.id + '" style="flex:1;min-width:0;">✏️ ' + t.name + '</button><button data-del-template="' + t.id + '" style="background:transparent;color:#e74c3c;border:none;padding:4px 6px;cursor:pointer;font-size:13px;" title="Видалити шаблон">🗑️</button></div>';
+    });
+    container.innerHTML = html;
+  }
+
+  function updateVentList() {
+    const list = document.getElementById('vent-list');
+    if (!list) return;
+    const ventElements = elements.filter(function(e) { return e.type === 'vent' || e.type === 'vent_equip'; });
+    if (ventElements.length === 0) { list.innerHTML = '<div class="vent-list-header">Немає елементів</div>'; return; }
+    let html = '<div class="vent-list-header">Додані елементи (' + ventElements.length + ')</div>';
+    ventElements.forEach(function(el) {
+      const label = el.name || (el.type === 'vent' ? 'Канал' : el.kind);
+      const icon = el.type === 'vent' ? '💨' : '🔧';
+      html += '<div class="vent-list-item" data-id="' + el.id + '"><span>' + icon + ' ' + label + '</span><button class="vent-del-btn" data-id="' + el.id + '">🗑️</button></div>';
+    });
+    list.innerHTML = html;
+    list.querySelectorAll('.vent-list-item').forEach(function(row) {
+      row.addEventListener('click', function(e) {
+        if (e.target.classList.contains('vent-del-btn')) return;
+        selectedId = parseInt(row.dataset.id);
+        updateProps(); draw();
+      });
+    });
+    list.querySelectorAll('.vent-del-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        saveState();
+        const id = parseInt(btn.dataset.id);
+        elements = elements.filter(function(e) { return e.id !== id; });
+        if (selectedId === id) { selectedId = null; updateProps(); }
+        draw();
+      });
+    });
+  }
+
+  function closeAllTabs() {
+    tabPanels.forEach(function(p) { p.classList.remove('visible'); });
+    tabLabels.forEach(function(l) { l.classList.remove('active'); });
+  }
+
+  tabLabels.forEach(function(label) {
+    label.addEventListener('click', function(e) {
+      e.stopPropagation();
+      const tabName = label.dataset.tab;
+      const panel = document.getElementById('panel-' + tabName);
+      const isOpen = panel.classList.contains('visible');
+      closeAllTabs();
+      if (!isOpen) {
+        panel.classList.add('visible');
+        label.classList.add('active');
+      }
+    });
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.tab-group')) {
+      closeAllTabs();
+    }
+  });
+
+  const ventPanel = document.getElementById('panel-vent');
+  ventPanel.addEventListener('click', function(e) {
+    if (e.target.closest('#vent-list')) return;
+    const ventBtn = e.target.closest('button[data-vent]');
+    if (ventBtn) {
+      const kind = ventBtn.dataset.vent;
+      closeAllTabs();
+      deactivateAllTools();
+      tempShape = null; currentCustomTemplate = null;
+      if (kind === 'duct') {
+        currentTool = 'vent'; currentVentKind = null; currentDuctShape = 'round';
+        toolHint.textContent = "Клік — початок каналу. Прив'язка до кінців. Рух — напрямок. Клік — завершення. Enter — точна довжина.";
+      } else if (kind === 'rect_duct') {
+        currentTool = 'vent'; currentVentKind = null; currentDuctShape = 'rect';
+        toolHint.textContent = "Клік — початок прямокутного каналу. Прив'язка до кінців. Рух — напрямок. Клік — завершення. Enter — точна довжина.";
+      } else if (kind === 'custom') {
+        const name = prompt('Назва нового елемента:', 'Новий елемент');
+        if (!name) return;
+        const color = prompt('Колір символу (hex, напр. #9b59b6):', '#9b59b6');
+        openSymbolEditor([], color, function(path) {
+          if (path.length === 0) { toolHint.textContent = 'Символ не створено.'; return; }
+          const templateId = Date.now();
+          customTemplates.push({ id: templateId, name: name, color: color, symbolPath: path });
+          saveTemplatesToStorage();
+          renderCustomButtons();
+          currentCustomTemplate = customTemplates[customTemplates.length - 1];
+          currentTool = 'custom_draw'; currentVentKind = 'custom';
+          toolHint.textContent = 'Клік — кут 1. Рух — розмір. Клік — кут 2. Намалюйте ' + name + '.';
+          draw();
+        });
+      } else {
+        currentTool = 'vent_equip'; currentVentKind = kind;
+        const names = { grille: 'решітку', fan: 'вентилятор', silencer: 'глушитель', damper: 'дросель-клапан' };
+        toolHint.textContent = 'Клік — по центру каналу. Клік біля краю каналу — по дотичній. Прив\'язка до повітропроводу.';
+      }
+      draw();
+      return;
+    }
+    const delTemplateBtn = e.target.closest('button[data-del-template]');
+    if (delTemplateBtn) {
+      e.stopPropagation();
+      const tid = parseInt(delTemplateBtn.dataset.delTemplate);
+      const tplName = (customTemplates.find(function(t){return t.id===tid;}) || {}).name || 'шаблон';
+      if (confirm('Видалити шаблон "' + tplName + '"?')) {
+        customTemplates = customTemplates.filter(function(t) { return t.id !== tid; });
+        saveTemplatesToStorage();
+        renderCustomButtons();
+      }
+      return;
+    }
+    const templateBtn = e.target.closest('button[data-template]');
+    if (templateBtn) {
+      const tid = parseInt(templateBtn.dataset.template);
+      currentCustomTemplate = customTemplates.find(function(t) { return t.id === tid; });
+      if (currentCustomTemplate && !currentCustomTemplate.symbolPath) currentCustomTemplate.symbolPath = [];
+      if (!currentCustomTemplate) return;
+      closeAllTabs();
+      deactivateAllTools();
+      tempShape = null; currentTool = 'custom_draw'; currentVentKind = 'custom';
+      toolHint.textContent = 'Клік — кут 1. Рух — розмір. Клік — кут 2. Прив\'язка до каналу (центр/дотична).';
+      draw();
+    }
+  });
+
+  toolBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      closeAllTabs();
+      deactivateAllTools();
+      btn.classList.add('active');
+      currentTool = btn.dataset.tool;
+      currentVentKind = null; currentDuctShape = 'round'; currentCustomTemplate = null;
+      tempShape = null; draggingElement = null; snapPoint = null;
+      const hints = {
+        select: 'Клікніть на елемент, щоб вибрати. Перетягніть для панорами.',
+        wall: "Клік — початок. Рух — напрямок. Прив'язка до кінців інших елементів. Клік — завершення. Enter — точна довжина.",
+        window: 'Клікніть, щоб розмістити вікно. Прив\'язка до стін.',
+        door: 'Клікніть, щоб розмістити двері. Прив\'язка до стін.',
+        dimension: 'Клікніть двічі, щоб створити вимір (початок → кінець). Прив\'язка до кінців.',
+        callout: 'Клік — точка на об\'єкті. Рух — положення тексту. Клік — завершення. Введіть текст.',
+        delete: 'Клікніть на елемент, щоб видалити його.'
+      };
+      toolHint.textContent = hints[currentTool] || '';
+      draw();
+    });
+  });
+
+  canvas.addEventListener('mousedown', function(e) {
+    canvas.focus();
+    const rect = canvas.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+    let wx = (e.clientX - rect.left - offsetX) / scale;
+    let wy = (e.clientY - rect.top - offsetY) / scale;
+    if (!Number.isFinite(wx) || !Number.isFinite(wy)) { console.warn('Invalid mouse coordinates'); return; }
+    if (['wall', 'vent', 'dimension', 'window', 'door', 'vent_equip'].includes(currentTool)) {
+      const sp = findSnap(wx, wy);
+      if (sp) { wx = sp.x; wy = sp.y; }
+    }
+    wx = snap(wx); wy = snap(wy);
+
+    if (currentTool === 'select') {
+      const el = getElementAt(wx, wy);
+      if (el) { selectedId = el.id; updateProps(); draw(); if (['window', 'door', 'vent_equip'].includes(el.type)) { draggingElement = el; dragOffset = { x: wx - el.x, y: wy - el.y }; } return; }
+      isPanning = true; panStart = { x: e.clientX, y: e.clientY, ox: offsetX, oy: offsetY };
+    }
+    if (currentTool === 'wall') {
+      if (!tempShape) { tempShape = { type: 'wall', x1: wx, y1: wy, x2: wx, y2: wy, thickness: 6, id: 'temp' }; }
+      else { saveState(); elements.push({ type: 'wall', x1: tempShape.x1, y1: tempShape.y1, x2: wx, y2: wy, thickness: 6, id: idCounter++ }); saveIdCounterToStorage(); tempShape = null; draw(); }
+    }
+    if (currentTool === 'vent') {
+      if (!tempShape) {
+        if (currentDuctShape === 'rect') {
+          tempShape = { type: 'vent', x1: wx, y1: wy, x2: wx, y2: wy, shape: 'rect', rectW: 160, rectH: 100, ventType: 'supply', airflow: 100, system: 'П1', name: '', id: 'temp' };
+        } else {
+          tempShape = { type: 'vent', x1: wx, y1: wy, x2: wx, y2: wy, shape: 'round', ventType: 'supply', diameter1: 160, diameter2: 160, airflow: 100, system: 'П1', name: '', id: 'temp' };
+        }
+      } else {
+        saveState();
+        const base = { type: 'vent', x1: tempShape.x1, y1: tempShape.y1, x2: wx, y2: wy, ventType: tempShape.ventType, system: tempShape.system, name: tempShape.name || '', id: idCounter++ };
+        if (tempShape.shape === 'rect') {
+          base.shape = 'rect'; base.rectW = tempShape.rectW; base.rectH = tempShape.rectH;
+        } else {
+          base.shape = 'round'; base.diameter1 = tempShape.diameter1; base.diameter2 = tempShape.diameter2; base.airflow = tempShape.airflow;
+        }
+        elements.push(base); saveIdCounterToStorage(); tempShape = null; draw();
+      }
+    }
+    if (currentTool === 'dimension') {
+      if (!tempShape) { tempShape = { type: 'dimension', x1: wx, y1: wy, x2: wx, y2: wy, id: 'temp' }; }
+      else { saveState(); elements.push({ type: 'dimension', x1: tempShape.x1, y1: tempShape.y1, x2: wx, y2: wy, id: idCounter++ }); saveIdCounterToStorage(); tempShape = null; draw(); }
+    }
+    if (currentTool === 'window') { saveState(); elements.push({ type: 'window', x: wx, y: wy, width: 60, height: 8, rotation: 0, name: 'Вікно ' + idCounter, id: idCounter++ }); saveIdCounterToStorage(); tempShape = null; draw(); }
+    if (currentTool === 'door') { saveState(); elements.push({ type: 'door', x: wx, y: wy, width: 40, height: 6, rotation: 0, swing: 'right', direction: 'forward', name: 'Двері ' + idCounter, id: idCounter++ }); saveIdCounterToStorage(); tempShape = null; draw(); }
+    if (currentTool === 'vent_equip') {
+      saveState();
+      const eqW = currentVentKind === 'fan' ? 50 : (currentVentKind === 'silencer' ? 80 : 60);
+      const eqH = currentVentKind === 'fan' ? 50 : 40;
+      const snapped = snapVentEquip(wx, wy, eqW, eqH);
+      const base = { type: 'vent_equip', kind: currentVentKind, x: snapped.x, y: snapped.y, width: eqW, height: eqH, rotation: snapped.rotation, name: '', system: 'П1', airflow: 100, id: idCounter++ };
+      if (currentVentKind === 'grille') { base.name = 'Решітка ' + base.id; base.width = 60; base.height = 40; base.ventType = 'supply'; }
+      else if (currentVentKind === 'fan') { base.name = 'Вентилятор ' + base.id; base.width = 50; base.height = 50; base.power = 100; }
+      else if (currentVentKind === 'silencer') { base.name = 'Глушитель ' + base.id; base.width = 80; base.height = 40; }
+      else if (currentVentKind === 'damper') { base.name = 'Клапан ' + base.id; base.width = 60; base.height = 40; base.openAngle = 45; }
+      elements.push(base); saveIdCounterToStorage(); draw();
+    }
+    if (currentTool === 'custom_draw') {
+      if (!tempShape) {
+        const tpl = currentCustomTemplate || { name: 'Елемент', color: '#9b59b6' };
+        tempShape = { type: 'custom_draw', x1: wx, y1: wy, x2: wx, y2: wy, name: tpl.name, symbolColor: tpl.color, id: 'temp' };
+      } else {
+        saveState();
+        const cx = (tempShape.x1 + tempShape.x2) / 2, cy = (tempShape.y1 + tempShape.y2) / 2;
+        const w = Math.abs(tempShape.x2 - tempShape.x1), h = Math.abs(tempShape.y2 - tempShape.y1);
+        const tplPath = currentCustomTemplate && currentCustomTemplate.symbolPath ? JSON.parse(JSON.stringify(currentCustomTemplate.symbolPath)) : [];
+        const snapped = snapVentEquip(cx, cy, Math.max(20, w), Math.max(20, h));
+        elements.push({ type: 'vent_equip', kind: 'custom', x: snapped.x, y: snapped.y, width: Math.max(20, w), height: Math.max(20, h), rotation: snapped.rotation, name: tempShape.name + ' ' + idCounter, system: 'П1', airflow: 100, symbolPath: tplPath, symbolColor: tempShape.symbolColor, id: idCounter++ }); saveIdCounterToStorage();
+        tempShape = null; currentTool = 'select'; currentVentKind = null; currentCustomTemplate = null;
+        deactivateAllTools();
+        document.querySelector('.tool-btn[data-tool="select"]').classList.add('active');
+        toolHint.textContent = 'Клікніть на елемент, щоб вибрати. Перетягніть для панорами.';
+        draw();
+      }
+    }
+    if (currentTool === 'callout') {
+      if (!tempShape) {
+        tempShape = { type: 'callout', x1: wx, y1: wy, x2: wx, y2: wy, text: '', fontSize: 12, id: 'temp' };
+      } else {
+        const text = prompt('Текст виноски:', 'Примітка');
+        if (text !== null) {
+          saveState();
+          elements.push({ type: 'callout', x1: tempShape.x1, y1: tempShape.y1, x2: wx, y2: wy, text: text, fontSize: 12, id: idCounter++ });
+          saveIdCounterToStorage();
+        }
+        tempShape = null; draw();
+      }
+    }
+    if (currentTool === 'delete') {
+      const el = getElementAt(wx, wy);
+      if (el) { saveState(); elements = elements.filter(function(e) { return e.id !== el.id; }); if (selectedId === el.id) selectedId = null; updateProps(); draw(); }
+    }
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    const rect = canvas.getBoundingClientRect();
+    let wx = (e.clientX - rect.left - offsetX) / scale;
+    let wy = (e.clientY - rect.top - offsetY) / scale;
+    if (['wall', 'vent', 'dimension', 'window', 'door', 'vent_equip'].includes(currentTool) || currentTool === 'select') {
+      const sp = findSnap(wx, wy, draggingElement ? draggingElement.id : null);
+      if (sp && (!snapPoint || snapPoint.x !== sp.x || snapPoint.y !== sp.y)) { snapPoint = sp; draw(); }
+      else if (!sp && snapPoint) { snapPoint = null; draw(); }
+    }
+    let snappedWx = wx, snappedWy = wy;
+    if (['wall', 'vent', 'dimension', 'window', 'door', 'vent_equip'].includes(currentTool)) {
+      const sp = findSnap(wx, wy); if (sp) { snappedWx = sp.x; snappedWy = sp.y; }
+    }
+    snappedWx = snap(snappedWx); snappedWy = snap(snappedWy);
+    coordsEl.textContent = 'X: ' + snappedWx.toFixed(0) + ' | Y: ' + snappedWy.toFixed(0);
+    if (draggingElement) { draggingElement.x = snap(wx - dragOffset.x); draggingElement.y = snap(wy - dragOffset.y); draw(); return; }
+    if (isPanning && panStart) { offsetX = panStart.ox + (e.clientX - panStart.x); offsetY = panStart.oy + (e.clientY - panStart.y); draw(); return; }
+    if (currentTool === 'vent_equip' || (currentTool === 'custom_draw' && currentVentKind === 'custom')) {
+      const eqW = currentTool === 'vent_equip' ? (currentVentKind === 'fan' ? 50 : (currentVentKind === 'silencer' ? 80 : 60)) : (currentCustomTemplate ? 60 : 60);
+      const eqH = currentTool === 'vent_equip' ? (currentVentKind === 'fan' ? 50 : 40) : (currentCustomTemplate ? 40 : 40);
+      const snapped = snapVentEquip(wx, wy, eqW, eqH);
+      tempShape = { type: 'vent_equip', kind: currentVentKind || 'custom', x: snapped.x, y: snapped.y, width: eqW, height: eqH, rotation: snapped.rotation, name: 'Preview', system: 'П1', airflow: 100, id: 'temp' };
+      if (currentVentKind === 'custom' && currentCustomTemplate) {
+        tempShape.symbolPath = currentCustomTemplate.symbolPath;
+        tempShape.symbolColor = currentCustomTemplate.color;
+      }
+      draw();
+      canvas.style.cursor = 'crosshair';
+    } else if (currentTool === 'window') {
+      tempShape = { type: 'window', x: snappedWx, y: snappedWy, width: 60, height: 8, rotation: 0, name: 'Preview', id: 'temp' };
+      draw(); canvas.style.cursor = 'crosshair';
+    } else if (currentTool === 'door') {
+      tempShape = { type: 'door', x: snappedWx, y: snappedWy, width: 40, height: 6, rotation: 0, swing: 'right', direction: 'forward', name: 'Preview', id: 'temp' };
+      draw(); canvas.style.cursor = 'crosshair';
+    } else if (currentTool === 'select') { const el = getElementAt(wx, wy); canvas.style.cursor = el ? 'pointer' : 'grab'; if (el && el.id !== hoverId) { hoverId = el.id; draw(); } else if (!el && hoverId) { hoverId = null; draw(); } }
+    else { canvas.style.cursor = 'crosshair'; }
+    if (tempShape && (currentTool === 'wall' || currentTool === 'vent' || currentTool === 'dimension' || currentTool === 'custom_draw' || currentTool === 'callout')) {
+      // Орто-режим: прив'язка до 0°, 90°, 45° при малюванні
+      if (tempShape.x1 !== undefined) {
+        const dx = snappedWx - tempShape.x1;
+        const dy = snappedWy - tempShape.y1;
+        const angle = Math.atan2(dy, dx);
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        // Прив'язка до найближчого кута: 0°, 45°, 90°, 135°, 180°...
+        const snapAngle = Math.round(angle / (Math.PI/4)) * (Math.PI/4);
+        tempShape.x2 = tempShape.x1 + dist * Math.cos(snapAngle);
+        tempShape.y2 = tempShape.y1 + dist * Math.sin(snapAngle);
+      } else {
+        tempShape.x2 = snappedWx; tempShape.y2 = snappedWy;
+      }
+      draw();
+    }
+  });
+
+  canvas.addEventListener('mouseup', function() {
+    if (draggingElement) saveState();
+    isPanning = false; panStart = null; draggingElement = null; dragOffset = null;
+  });
+  canvas.addEventListener('mouseleave', function() { isPanning = false; draggingElement = null; hoverId = null; snapPoint = null; tempShape = null; draw(); });
+  canvas.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const wx = (mx - offsetX) / scale, wy = (my - offsetY) / scale;
+    const delta = e.deltaY > 0 ? 0.9 : 1.1;
+    scale = Math.max(0.01, Math.min(20, scale * delta));
+    offsetX = mx - wx * scale; offsetY = my - wy * scale;
+    draw();
+  }, { passive: false });
+
+  document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+    // Стрілки для пересування по кресленню
+    if (e.key === 'ArrowLeft') { e.preventDefault(); offsetX += 30 * scale; draw(); return; }
+    if (e.key === 'ArrowRight') { e.preventDefault(); offsetX -= 30 * scale; draw(); return; }
+    if (e.key === 'ArrowUp') { e.preventDefault(); offsetY += 30 * scale; draw(); return; }
+    if (e.key === 'ArrowDown') { e.preventDefault(); offsetY -= 30 * scale; draw(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') { e.preventDefault(); undo(); return; }
+    if (e.key === 'Enter' && tempShape && (tempShape.type === 'wall' || tempShape.type === 'vent')) {
+      e.preventDefault();
+      const dx = tempShape.x2 - tempShape.x1, dy = tempShape.y2 - tempShape.y1;
+      const currentLen = Math.sqrt(dx*dx + dy*dy), currentAngle = Math.atan2(dy, dx);
+      const input = prompt('Введіть довжину (мм):', currentLen.toFixed(0));
+      if (input === null) return;
+      const len = parseFloat(input);
+      if (isNaN(len) || len <= 0) { alert('Некоректна довжина'); return; }
+      const x2 = tempShape.x1 + len * Math.cos(currentAngle), y2 = tempShape.y1 + len * Math.sin(currentAngle);
+      if (tempShape.type === 'wall') { saveState(); elements.push({ type: 'wall', x1: tempShape.x1, y1: tempShape.y1, x2: snap(x2), y2: snap(y2), thickness: 6, id: idCounter++ }); saveIdCounterToStorage(); }
+      else if (tempShape.type === 'vent') { saveState(); elements.push({ type: 'vent', x1: tempShape.x1, y1: tempShape.y1, x2: snap(x2), y2: snap(y2), ventType: tempShape.ventType, diameter1: tempShape.diameter1, diameter2: tempShape.diameter2, airflow: tempShape.airflow, system: tempShape.system, name: tempShape.name, id: idCounter++ }); saveIdCounterToStorage(); }
+      tempShape = null; draw();
+    }
+    if (e.key === 'Escape') {
+      if (tempShape) { tempShape = null; draw(); }
+      if (selectedId) { selectedId = null; updateProps(); draw(); }
+      // Скидаємо інструмент на "вибір" і дозволяємо пересування
+      currentTool = 'select';
+      deactivateAllTools();
+      document.querySelector('[data-tool="select"]').classList.add('active');
+      canvas.style.cursor = 'grab';
+      draw();
+      return;
+    }
+  });
+
+  document.getElementById('zoom-in').addEventListener('click', function() { scale = Math.min(20, scale * 1.5); draw(); });
+  document.getElementById('zoom-out').addEventListener('click', function() { scale = Math.max(0.01, scale / 1.5); draw(); });
+  document.getElementById('zoom-reset').addEventListener('click', function() { scale = 1; offsetX = 0; offsetY = 0; draw(); });
+document.getElementById('zoom-fit').addEventListener('click', function() { 
+    // Автоматичне масштабування, щоб вмістити все креслення
+    var bounds = getDrawingBounds();
+    if (bounds) {
+        var padding = 50;
+        var scaleX = (canvas.width - padding * 2) / bounds.width;
+        var scaleY = (canvas.height - padding * 2) / bounds.height;
+        scale = Math.max(0.01, Math.min(20, Math.min(scaleX, scaleY)));
+        offsetX = canvas.width / 2 - (bounds.minX + bounds.width / 2) * scale;
+        offsetY = canvas.height / 2 - (bounds.minY + bounds.height / 2) * scale;
+        draw();
+    }
+});
+
+  document.getElementById('print-btn').addEventListener('click', function() {
+    window.print();
+  });
+
+  document.getElementById('save-img-btn').addEventListener('click', function() {
+    const link = document.createElement('a');
+    link.download = 'kreslennya.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  });
+
+  document.getElementById('pdf-btn').addEventListener('click', function() {
+    const dataUrl = canvas.toDataURL('image/png');
+    const blob = new Blob(['<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Креслення проекту</title><style>body{margin:0;display:flex;justify-content:center;align-items:center;height:100vh;background:#fff;}img{max-width:100%;max-height:100%;}@media print{body{background:#fff;margin:0;}img{max-width:100%;max-height:100%;box-shadow:none;}}</style></head><body><img src="' + dataUrl + '" onload="setTimeout(function(){window.print();},400);"></body></html>'], {type: 'text/html'});
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+  });
+  document.getElementById('clear-btn').addEventListener('click', function() { if (confirm('Очистити всі елементи?')) { saveState(); elements = []; selectedId = null; tempShape = null; updateProps(); draw(); } });
+  document.getElementById('export-btn').addEventListener('click', function() {
+    const data = JSON.stringify(elements, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'project_drawing.json'; a.click(); URL.revokeObjectURL(url);
+  });
+  document.getElementById('save-file-btn').addEventListener('click', function() {
+    const data = JSON.stringify(elements, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'kreslennya_project.json'; a.click(); URL.revokeObjectURL(url);
+  });
+  document.getElementById('import-btn').addEventListener('click', function() { document.getElementById('file-input').click(); });
+  document.getElementById('file-input').addEventListener('change', function(e) {
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (Array.isArray(data)) { saveState(); elements = data; const maxId = Math.max.apply(null, elements.map(function(el) { return el.id || 0; }).concat([0])); idCounter = maxId + 1; selectedId = null; updateProps(); draw(); alert('Проєкт завантажено успішно!'); }
+      } catch (err) { alert('Помилка завантаження файлу'); }
+    };
+    reader.readAsText(file); e.target.value = '';
+  });
+
+  elements.push(
+    { type: 'wall', x1: 100, y1: 100, x2: 400, y2: 100, thickness: 6, id: idCounter++ },
+    { type: 'wall', x1: 400, y1: 100, x2: 400, y2: 300, thickness: 6, id: idCounter++ },
+    { type: 'wall', x1: 400, y1: 300, x2: 100, y2: 300, thickness: 6, id: idCounter++ },
+    { type: 'wall', x1: 100, y1: 300, x2: 100, y2: 100, thickness: 6, id: idCounter++ },
+    { type: 'wall', x1: 100, y1: 200, x2: 400, y2: 200, thickness: 6, id: idCounter++ },
+    { type: 'window', x: 250, y: 100, width: 60, height: 8, rotation: 0, name: 'Вікно 1', id: idCounter++ },
+    { type: 'window', x: 250, y: 200, width: 60, height: 8, rotation: 0, name: 'Вікно 2', id: idCounter++ },
+    { type: 'door', x: 400, y: 150, width: 40, height: 6, rotation: 90, swing: 'right', direction: 'forward', name: 'Вхідні двері', id: idCounter++ },
+    { type: 'door', x: 100, y: 250, width: 40, height: 6, rotation: 90, swing: 'left', direction: 'backward', name: 'Міжкімнатні', id: idCounter++ },
+    { type: 'vent', x1: 150, y1: 150, x2: 250, y2: 150, ventType: 'supply', diameter1: 200, diameter2: 160, airflow: 120, system: 'П1', name: 'Приплив 1', id: idCounter++ },
+    { type: 'vent', x1: 300, y1: 250, x2: 300, y2: 180, ventType: 'exhaust', diameter1: 160, diameter2: 125, airflow: 80, system: 'В1', name: 'Витяжка 1', id: idCounter++ },
+    { type: 'dimension', x1: 100, y1: 80, x2: 400, y2: 80, offset: 30, id: idCounter++ },
+    { type: 'vent_equip', kind: 'grille', x: 150, y: 100, width: 60, height: 40, rotation: 0, name: 'Решітка приплив', system: 'П1', airflow: 150, ventType: 'supply', id: idCounter++ },
+    { type: 'vent_equip', kind: 'fan', x: 320, y: 150, width: 50, height: 50, rotation: 0, name: 'Вентилятор', system: 'П1', airflow: 200, power: 150, id: idCounter++ },
+    { type: 'vent_equip', kind: 'silencer', x: 200, y: 250, width: 80, height: 40, rotation: 0, name: 'Глушитель', system: 'В1', airflow: 100, id: idCounter++ },
+    { type: 'vent_equip', kind: 'damper', x: 350, y: 250, width: 60, height: 40, rotation: 0, name: 'Дросель', system: 'В1', airflow: 80, openAngle: 30, id: idCounter++ }
+  );
+
+  loadTemplatesFromStorage();
+  loadIdCounterFromStorage();
+  // Auto-load last saved project
+  try {
+    const autoData = localStorage.getItem('projectAutoSave');
+    if (autoData) {
+      const parsed = JSON.parse(autoData);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        if (confirm('Знайдено автоматично збережений проєкт. Завантажити його?')) {
+          elements = parsed;
+          const maxId = Math.max.apply(null, elements.map(function(el) { return el.id || 0; }).concat([0]));
+          idCounter = maxId + 1;
+        }
+      }
+    }
+  } catch(e) {}
+  history = [JSON.parse(JSON.stringify(elements))];
+  historyIndex = 0;
+  renderCustomButtons();
+
+
+    document.getElementById('save-project-btn').addEventListener('click', async function() {
+    if (!projectId) { alert('❌ projectId не встановлено!'); return; }
+    try {
+      const ok = await window.pywebview.api.save_drawing(projectId, JSON.stringify(elements));
+      alert(ok ? '✅ Збережено в проєкт!' : '❌ Помилка збереження');
+    } catch(e) {
+      alert('❌ Помилка: ' + (e.message || e));
+    }
+  });
+  document.getElementById('close-editor-btn').addEventListener('click', function() {
+    if (isPyWebView) window.pywebview.api.close_editor();
+    else window.close();
+  });
+
+    initPyWebView();
+    setTimeout(function() { initPyWebView(); }, 500);
+    resize(); draw();
+  
+})();
+</script>
+</body>
+</html>
