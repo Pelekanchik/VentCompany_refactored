@@ -1,18 +1,12 @@
-#!/usr/bin/env python3
 """
-Модуль графічного інтерфейсу VentCompany.
+Пакет GUI для VentCompany.
 """
 
-import tkinter as tk
+from .cutting_tab import CuttingTab
+from .products_tab import ProductsTab
+from .specification_tab import SpecificationTab
 
-from .main_window import VentilationApp
+# MainWindow НЕ імпортуємо тут — імпортуйте напряму:
+#   from ventilation_company.gui.main_window import MainWindow
 
-
-def main():
-    """Точка входу для GUI."""
-    root = tk.Tk()
-    VentilationApp(root)
-    root.mainloop()
-
-
-__all__ = ["VentilationApp", "main"]
+__all__ = ["ProductsTab", "SpecificationTab", "CuttingTab"]

@@ -1,244 +1,302 @@
-#!/usr/bin/env python3
+r"""
+Експортер у FreeCAD (.FCStd).
+Створює 3D-моделі з CAD-сутностей (лінії, кола, прямокутники, полілінії).
+
+Вимоги:
+    - Встановлений FreeCAD (https://www.freecad.org/downloads.php)
+    - FreeCAD доступний у PYTHONPATH
+
+Windows: додайте у системну змінну PYTHONPATH:
+    C:\Program Files\FreeCAD 1.0\bin
+    C:\Program Files\FreeCAD 1.0\lib
 """
-freecad_exporter.py — Експорт CAD у FreeCAD
-Варіант 1: Прямий імпорт (Linux / Python 3.11)
-Варіант 2: CLI через freecadcmd.exe (Windows)
-"""
+
+import math
 import os
-import subprocess
 import sys
-import tempfile
-
-# --- FreeCAD шляхи ---
-FREECAD_PATHS = [
-    "/usr/lib/freecad/lib",
-    "/usr/lib/freecad-daily/lib",
-    "C:\\Program Files\\FreeCAD 0.21\\bin",
-    "C:\\Program Files\\FreeCAD 1.0\\bin",
-    "C:\\Program Files\\FreeCAD 1.1\\bin",
-]
-
-FREECAD_CMD = r"C:\Program Files\FreeCAD 1.1\bin\freecadcmd.exe"
 
 FREECAD_AVAILABLE = False
-FREECAD_IMPORT = False
+FreeCAD = None
+Part = None
+Draft = None
 
-# Спробуємо імпортувати
-for path in FREECAD_PATHS:
-    if os.path.exists(path) and path not in sys.path:
-        sys.path.insert(0, path)
+# Спробуємо знайти FreeCAD у типових місцях
+_freecad_paths = [
+    "C:/\\Program Files/FreeCAD 1.0/bin",
+    "C:/\\Program Files/FreeCAD 0.21/bin",
+    "C:/\\Program Files/FreeCAD 1.1/bin",
+    "/usr/lib/freecad/lib",
+    "/usr/lib/freecad-daily/lib",
+    "/usr/local/lib/freecad/lib",
+    "/Applications/FreeCAD.app/Contents/lib",
+]
+
+for p in _freecad_paths:
+    if os.path.exists(p) and p not in sys.path:
+        sys.path.append(p)
 
 try:
-    import Draft  # noqa: F401
-    import FreeCAD as App  # noqa: F401
-    import Part  # noqa: F401
+    import Draft
+    import FreeCAD as FC
+    import Part
 
+    FreeCAD = FC
     FREECAD_AVAILABLE = True
-    FREECAD_IMPORT = True
 except ImportError:
     pass
 
-# Спробуємо знайти freecadcmd (Windows CLI)
-if not FREECAD_AVAILABLE and os.path.exists(FREECAD_CMD):
-    FREECAD_AVAILABLE = True
+
+def check_freecad():
+    """Перевірити чи доступний FreeCAD."""
+    return FREECAD_AVAILABLE
 
 
 class FreeCADExporter:
-    """Експортує CAD-об'єкти у FreeCAD .FCStd"""
+    """Експортер CAD-сутностей у FreeCAD .FCStd файл."""
 
     def __init__(self):
+        self.doc = None
         if not FREECAD_AVAILABLE:
-            raise ImportError(
-                "FreeCAD not found!\n"
-                "Install: https://www.freecadweb.org/downloads.php\n"
-                "Linux: sudo apt install freecad\n"
-                "Windows: download installer"
+            raise RuntimeError(
+                "FreeCAD не знайдено. Встановіть FreeCAD та додайте його lib/ у PYTHONPATH."
             )
 
-    def export_entities(self, entities, filepath):
-        """Експорт через прямий імпорт або CLI"""
-        if FREECAD_IMPORT:
-            return self._export_import(entities, filepath)
+    def create_document(self, name="VentProject"):
+        """Створити новий FreeCAD документ."""
+        self.doc = FreeCAD.newDocument(name)
+        return self.doc
+
+    def _make_wire(self, points, closed=False):
+        """Створити Part.Wire зі списку точок."""
+        vectors = [FreeCAD.Vector(p.x, p.y, 0) for p in points]
+        edges = []
+        for i in range(len(vectors) - 1):
+            edges.append(Part.makeLine(vectors[i], vectors[i + 1]))
+        if closed and len(vectors) > 2:
+            edges.append(Part.makeLine(vectors[-1], vectors[0]))
+        if not edges:
+            return None
+        wire = Part.Wire(edges)
+        return wire
+
+    def export_line(self, line, thickness=0.7, name="Line"):
+        """Експортувати лінію як тонкий профіль (для листового металу)."""
+        p1 = FreeCAD.Vector(line.p1.x, line.p1.y, 0)
+        p2 = FreeCAD.Vector(line.p2.x, line.p2.y, 0)
+        edge = Part.makeLine(p1, p2)
+
+        # Для вентиляції: створюємо прямокутний профіль товщиною `thickness`
+        # перпендикулярно лінії
+        dx = p2.x - p1.x
+        dy = p2.y - p1.y
+        length = math.hypot(dx, dy)
+        if length < 1e-9:
+            return None
+
+        # Нормаль (перпендикуляр)
+        nx = -dy / length * (thickness / 2)
+        ny = dx / length * (thickness / 2)
+
+        # Прямокутник вздовж лінії
+        pts = [
+            FreeCAD.Vector(p1.x + nx, p1.y + ny, 0),
+            FreeCAD.Vector(p2.x + nx, p2.y + ny, 0),
+            FreeCAD.Vector(p2.x - nx, p2.y - ny, 0),
+            FreeCAD.Vector(p1.x - nx, p1.y - ny, 0),
+            FreeCAD.Vector(p1.x + nx, p1.y + ny, 0),
+        ]
+        wire = Part.makePolygon(pts)
+        face = Part.Face(wire)
+
+        obj = self.doc.addObject("Part::Feature", name)
+        obj.Shape = face
+        return obj
+
+    def export_rectangle(self, rect, thickness=0.7, name="RectDuct"):
+        """Експортувати прямокутник як профіль повітропроводу."""
+        x1, y1 = rect.p1.x, rect.p1.y
+        x2, y2 = rect.p2.x, rect.p2.y
+
+        # Зовнішній прямокутник
+        outer = [
+            FreeCAD.Vector(x1, y1, 0),
+            FreeCAD.Vector(x2, y1, 0),
+            FreeCAD.Vector(x2, y2, 0),
+            FreeCAD.Vector(x1, y2, 0),
+            FreeCAD.Vector(x1, y1, 0),
+        ]
+        wire_outer = Part.makePolygon(outer)
+
+        # Внутрішній (з урахуванням товщини)
+        t = thickness
+        inner = [
+            FreeCAD.Vector(x1 + t, y1 + t, 0),
+            FreeCAD.Vector(x2 - t, y1 + t, 0),
+            FreeCAD.Vector(x2 - t, y2 - t, 0),
+            FreeCAD.Vector(x1 + t, y2 - t, 0),
+            FreeCAD.Vector(x1 + t, y1 + t, 0),
+        ]
+        wire_inner = Part.makePolygon(inner)
+
+        face_outer = Part.Face(wire_outer)
+        face_inner = Part.Face(wire_inner)
+
+        # Профіль = зовнішній - внутрішній
+        if face_outer.isValid() and face_inner.isValid():
+            shape = face_outer.cut(face_inner)
         else:
-            return self._export_cli(entities, filepath)
+            shape = face_outer
 
-    def _export_import(self, entities, filepath):
-        """Експорт через прямий імпорт модулів"""
-        import Draft  # noqa: F401
-        import FreeCAD as App  # noqa: F401
-        import Part  # noqa: F401
+        obj = self.doc.addObject("Part::Feature", name)
+        obj.Shape = shape
+        return obj
 
-        doc = App.newDocument("VentilationProject")
+    def export_circle(self, circle, thickness=0.7, name="RoundDuct"):
+        """Експортувати коло як круглий повітропровід."""
+        cx, cy = circle.center.x, circle.center.y
+        r = circle.radius
 
-        for i, entity in enumerate(entities):
-            type_name = type(entity).__name__
-            name = f"obj_{i}"
+        # Зовнішнє коло
+        outer = Part.makeCircle(r, FreeCAD.Vector(cx, cy, 0))
+        wire_outer = Part.Wire([outer])
+        face_outer = Part.Face(wire_outer)
 
-            if type_name == "CADLine":
-                line = Part.makeLine((entity.p1.x, entity.p1.y, 0), (entity.p2.x, entity.p2.y, 0))
-                edge = doc.addObject("Part::Feature", name)
-                edge.Shape = line
+        # Внутрішнє коло (з урахуванням товщини)
+        if r > thickness:
+            inner = Part.makeCircle(r - thickness, FreeCAD.Vector(cx, cy, 0))
+            wire_inner = Part.Wire([inner])
+            face_inner = Part.Face(wire_inner)
+            shape = face_outer.cut(face_inner)
+        else:
+            shape = face_outer
 
-            elif type_name == "CADRectangle":
-                x1, y1 = entity.p1.x, entity.p1.y
-                x2, y2 = entity.p2.x, entity.p2.y
-                w, h = abs(x2 - x1), abs(y2 - y1)
-                box = doc.addObject("Part::Box", name)
-                box.Length = max(w, h)
-                box.Width = min(w, h)
-                box.Height = 50
-                box.Placement.Base = App.Vector(min(x1, x2), min(y1, y2), 0)
+        obj = self.doc.addObject("Part::Feature", name)
+        obj.Shape = shape
+        return obj
 
-            elif type_name == "CADCircle":
-                cyl = doc.addObject("Part::Cylinder", name)
-                cyl.Radius = entity.radius
-                cyl.Height = 100
-                cyl.Placement.Base = App.Vector(entity.center.x, entity.center.y, 0)
+    def export_polyline(self, poly, thickness=0.7, name="Polyline"):
+        """Експортувати полілінію."""
+        wire = self._make_wire(poly.points, poly.closed)
+        if wire is None:
+            return None
 
-            elif type_name == "CADArc":
-                torus = doc.addObject("Part::Torus", name)
-                torus.Radius1 = entity.radius * 2
-                torus.Radius2 = entity.radius
-                torus.Angle1 = entity.start_angle
-                torus.Angle2 = entity.end_angle
-                torus.Placement.Base = App.Vector(entity.center.x, entity.center.y, 0)
+        if poly.closed and len(poly.points) > 2:
+            face = Part.Face(wire)
+            obj = self.doc.addObject("Part::Feature", name)
+            obj.Shape = face
+        else:
+            obj = self.doc.addObject("Part::Feature", name)
+            obj.Shape = wire
+        return obj
 
-            elif type_name == "CADPolyline" and len(entity.points) >= 2:
-                pts = [(p.x, p.y, 0) for p in entity.points]
-                wire = Part.makePolygon(pts)
-                poly = doc.addObject("Part::Feature", name)
-                poly.Shape = wire
+    def export_arc(self, arc, thickness=0.7, name="Arc"):
+        """Експортувати дугу."""
+        cx, cy = arc.center.x, arc.center.y
+        r = arc.radius
+        sa = math.radians(arc.start_angle)
+        ea = math.radians(arc.end_angle)
 
-            elif type_name == "CADText":
-                text = Draft.makeText(
-                    entity.text,
-                    placement=App.Placement(App.Vector(entity.x, entity.y, 0), App.Rotation()),
+        arc_shape = Part.makeCircle(
+            r, FreeCAD.Vector(cx, cy, 0), FreeCAD.Vector(0, 0, 1), arc.start_angle, arc.end_angle
+        )
+        wire = Part.Wire([arc_shape])
+
+        obj = self.doc.addObject("Part::Feature", name)
+        obj.Shape = wire
+        return obj
+
+    def export_entities(self, entities, filepath, thickness=0.7):
+        """Експортувати список CAD-сутностей у .FCStd файл."""
+        self.create_document()
+
+        for i, e in enumerate(entities):
+            name = f"{type(e).__name__}_{i+1}"
+            try:
+                from ventilation_company.cad_editor import (
+                    CADArc,
+                    CADCircle,
+                    CADHole,
+                    CADLine,
+                    CADPolyline,
+                    CADRectangle,
                 )
-                text.Label = name
 
-        doc.recompute()
-        doc.saveAs(filepath)
-        App.closeDocument(doc.Name)
+                if isinstance(e, CADLine):
+                    self.export_line(e, thickness, name)
+                elif isinstance(e, CADRectangle):
+                    self.export_rectangle(e, thickness, name)
+                elif isinstance(e, CADCircle):
+                    self.export_circle(e, thickness, name)
+                elif isinstance(e, CADPolyline):
+                    self.export_polyline(e, thickness, name)
+                elif isinstance(e, CADArc):
+                    self.export_arc(e, thickness, name)
+                elif isinstance(e, CADHole):
+                    self.export_circle(e, e.radius, name)  # Отвір як коло
+                # Текст, розміри, штрихування — пропускаємо (2D-анотації)
+            except Exception as ex:
+                print(f"Помилка експорту {name}: {ex}")
+
+        self.doc.recompute()
+        self.doc.saveAs(filepath)
         return filepath
 
-    def _export_cli(self, entities, filepath):
-        """Експорт через freecadcmd.exe (Windows)"""
+    def export_to_dxf(self, entities, filepath):
+        """Експортувати у DXF через FreeCAD (якщо доступний ImportDXF)."""
+        self.create_document()
 
-        if not os.path.exists(FREECAD_CMD):
-            raise FileNotFoundError(f"freecadcmd.exe not found: {FREECAD_CMD}")
-
-        # Генеруємо Python скрипт
-        lines = [
-            "import FreeCAD as App  # noqa: F401",
-            "import Part  # noqa: F401",
-            "import Draft  # noqa: F401",
-            "",
-            'doc = App.newDocument("Ventilation")',
-            "",
-        ]
-
-        for i, entity in enumerate(entities):
-            type_name = type(entity).__name__
-            name = f"obj_{i}"
-
-            if type_name == "CADLine":
-                lines.append(
-                    f"line = Part.makeLine(({entity.p1.x}, {entity.p1.y}, 0), ({entity.p2.x}, {entity.p2.y}, 0))"
+        for i, e in enumerate(entities):
+            name = f"{type(e).__name__}_{i+1}"
+            try:
+                from ventilation_company.cad_editor import (
+                    CADArc,
+                    CADCircle,
+                    CADLine,
+                    CADPolyline,
+                    CADRectangle,
                 )
-                lines.append(f"edge = doc.addObject('Part::Feature', '{name}')")
-                lines.append("edge.Shape = line")
-                lines.append("")
 
-            elif type_name == "CADRectangle":
-                x1, y1 = entity.p1.x, entity.p1.y
-                x2, y2 = entity.p2.x, entity.p2.y
-                w, h = abs(x2 - x1), abs(y2 - y1)
-                lines.append(f"box = doc.addObject('Part::Box', '{name}')")
-                lines.append(f"box.Length = {max(w,h)}")
-                lines.append(f"box.Width = {min(w,h)}")
-                lines.append("box.Height = 50")
-                lines.append(f"box.Placement.Base = App.Vector({min(x1,x2)}, {min(y1,y2)}, 0)")
-                lines.append("")
+                if isinstance(e, CADLine):
+                    self.export_line(e, name=name)
+                elif isinstance(e, CADRectangle):
+                    self.export_rectangle(e, name=name)
+                elif isinstance(e, CADCircle):
+                    self.export_circle(e, name=name)
+                elif isinstance(e, CADPolyline):
+                    self.export_polyline(e, name=name)
+                elif isinstance(e, CADArc):
+                    self.export_arc(e, name=name)
+            except Exception as ex:
+                print(f"Помилка експорту {name}: {ex}")
 
-            elif type_name == "CADCircle":
-                lines.append(f"cyl = doc.addObject('Part::Cylinder', '{name}')")
-                lines.append(f"cyl.Radius = {entity.radius}")
-                lines.append("cyl.Height = 100")
-                lines.append(
-                    f"cyl.Placement.Base = App.Vector({entity.center.x}, {entity.center.y}, 0)"
-                )
-                lines.append("")
+        self.doc.recompute()
 
-            elif type_name == "CADArc":
-                lines.append(f"torus = doc.addObject('Part::Torus', '{name}')")
-                lines.append(f"torus.Radius1 = {entity.radius * 2}")
-                lines.append(f"torus.Radius2 = {entity.radius}")
-                lines.append(f"torus.Angle1 = {entity.start_angle}")
-                lines.append(f"torus.Angle2 = {entity.end_angle}")
-                lines.append(
-                    f"torus.Placement.Base = App.Vector({entity.center.x}, {entity.center.y}, 0)"
-                )
-                lines.append("")
+        # Спробуємо експортувати у DXF
+        try:
+            import Import
 
-            elif type_name == "CADPolyline" and len(entity.points) >= 2:
-                pts = ", ".join([f"({p.x}, {p.y}, 0)" for p in entity.points])
-                lines.append(f"pts = [{pts}]")
-                lines.append("wire = Part.makePolygon(pts)")
-                lines.append(f"poly = doc.addObject('Part::Feature', '{name}')")
-                lines.append("poly.Shape = wire")
-                lines.append("")
+            Import.export(self.doc.Objects, filepath)
+        except ImportError:
+            # Fallback: зберегти як FCStd і повідомити
+            fcstd_path = filepath.replace(".dxf", ".FCStd")
+            self.doc.saveAs(fcstd_path)
+            raise RuntimeError(f"DXF-експорт недоступний. Збережено як {fcstd_path}")
 
-            elif type_name == "CADText":
-                txt = entity.text.replace("'", "\\'")
-                lines.append(
-                    f"text = Draft.makeText('{txt}', placement=App.Placement(App.Vector({entity.x}, {entity.y}, 0), App.Rotation()))"
-                )
-                lines.append(f"text.Label = '{name}'")
-                lines.append("")
+        return filepath
 
-        lines.extend(
-            [
-                "doc.recompute()",
-                f'doc.saveAs(r"{filepath}")',
-                "App.closeDocument(doc.Name)",
-            ]
-        )
-
-        # Тимчасовий скрипт
-        fd, script_path = tempfile.mkstemp(suffix=".py")
-        with os.fdopen(fd, "w") as f:
-            f.write("\n".join(lines))
-
-        # Запуск
-        result = subprocess.run([FREECAD_CMD, script_path], capture_output=True, text=True)
-        os.unlink(script_path)
-
-        if result.returncode != 0:
-            raise RuntimeError(f"FreeCAD error: {result.stderr}")
-
-        if os.path.exists(filepath):
-            return filepath
-        raise RuntimeError("FreeCAD did not create file")
+    def close(self):
+        """Закрити документ."""
+        if self.doc:
+            FreeCAD.closeDocument(self.doc.Name)
+            self.doc = None
 
 
-def check_freecad():
-    """Перевірка FreeCAD"""
-    print("Checking FreeCAD...")
-
-    if FREECAD_IMPORT:
-        import FreeCAD as App  # noqa: F401
-
-        print(f"  Direct import: OK (v{App.Version()})")
-        return True
-
-    if os.path.exists(FREECAD_CMD):
-        print(f"  CLI mode: OK ({FREECAD_CMD})")
-        return True
-
-    print("  Not found!")
-    print("  Install from: https://www.freecadweb.org/downloads.php")
-    return False
+# =========================================================
+# ШВИДКІ ФУНКЦІЇ
+# =========================================================
 
 
-if __name__ == "__main__":
-    check_freecad()
+def export_to_freecad(entities, filepath, thickness=0.7):
+    """Швидкий експорт списку сутностей у FreeCAD файл."""
+    exporter = FreeCADExporter()
+    return exporter.export_entities(entities, filepath, thickness)

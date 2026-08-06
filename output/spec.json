@@ -1,0 +1,259 @@
+{
+  "project_name": "Вентиляція офісу №42",
+  "project_id": "VENT-2026-042",
+  "created_at": "2026-08-06 23:20",
+  "summary": {
+    "total_items": 9,
+    "total_quantity": 39,
+    "total_weight_kg": 213.271,
+    "total_area_m2": 34.4824,
+    "total_price": 11729.88
+  },
+  "items": [
+    {
+      "position": 1,
+      "name": "Повітропровід 400×200",
+      "product_type": "повітропровід прямокутний",
+      "dimensions": "400×200×1500",
+      "material": "оцинкована сталь",
+      "thickness": 0.7,
+      "unit": "шт",
+      "quantity": 5,
+      "weight_per_unit": 9.891,
+      "weight_total": 49.455,
+      "area_per_unit": 1.8,
+      "area_total": 9.0,
+      "price_per_unit": 544.005,
+      "price_total": 2720.025,
+      "notes": ""
+    },
+    {
+      "position": 2,
+      "name": "Повітропровід 500×300",
+      "product_type": "повітропровід прямокутний",
+      "dimensions": "500×300×2000",
+      "material": "оцинкована сталь",
+      "thickness": 0.9,
+      "unit": "шт",
+      "quantity": 3,
+      "weight_per_unit": 22.608,
+      "weight_total": 67.824,
+      "area_per_unit": 3.2,
+      "area_total": 9.600000000000001,
+      "price_per_unit": 1243.44,
+      "price_total": 3730.32,
+      "notes": ""
+    },
+    {
+      "position": 3,
+      "name": "Повітропровід Ø250",
+      "product_type": "повітропровід круглий",
+      "dimensions": "250×250×3000",
+      "material": "оцинкована сталь",
+      "thickness": 0.7,
+      "unit": "шт",
+      "quantity": 4,
+      "weight_per_unit": 12.9473,
+      "weight_total": 51.7892,
+      "area_per_unit": 2.3562,
+      "area_total": 9.4248,
+      "price_per_unit": 712.1015,
+      "price_total": 2848.406,
+      "notes": ""
+    },
+    {
+      "position": 4,
+      "name": "Фланець 400×200",
+      "product_type": "фланець прямокутний",
+      "dimensions": "400×200",
+      "material": "оцинкована сталь",
+      "thickness": 1.0,
+      "unit": "шт",
+      "quantity": 10,
+      "weight_per_unit": 0.9296,
+      "weight_total": 9.296,
+      "area_per_unit": 0.1184,
+      "area_total": 1.1840000000000002,
+      "price_per_unit": 51.128,
+      "price_total": 511.28,
+      "notes": ""
+    },
+    {
+      "position": 5,
+      "name": "Фланець Ø250",
+      "product_type": "фланець круглий",
+      "dimensions": "250×250",
+      "material": "оцинкована сталь",
+      "thickness": 1.0,
+      "unit": "шт",
+      "quantity": 8,
+      "weight_per_unit": 0.2022,
+      "weight_total": 1.6176,
+      "area_per_unit": 0.0258,
+      "area_total": 0.2064,
+      "price_per_unit": 11.120999999999999,
+      "price_total": 88.96799999999999,
+      "notes": ""
+    },
+    {
+      "position": 6,
+      "name": "Трійник 400×200/200×200",
+      "product_type": "трійник прямокутний",
+      "dimensions": "400×200×800",
+      "material": "оцинкована сталь",
+      "thickness": 0.9,
+      "unit": "шт",
+      "quantity": 2,
+      "weight_per_unit": 10.0747,
+      "weight_total": 20.1494,
+      "area_per_unit": 1.426,
+      "area_total": 2.852,
+      "price_per_unit": 554.1085,
+      "price_total": 1108.217,
+      "notes": ""
+    },
+    {
+      "position": 7,
+      "name": "Перехід 500×300→400×200",
+      "product_type": "перехід прямокутний",
+      "dimensions": "500×300×400",
+      "material": "оцинкована сталь",
+      "thickness": 0.9,
+      "unit": "шт",
+      "quantity": 1,
+      "weight_per_unit": 4.352,
+      "weight_total": 4.352,
+      "area_per_unit": 0.616,
+      "area_total": 0.616,
+      "price_per_unit": 239.36,
+      "price_total": 239.36,
+      "notes": ""
+    },
+    {
+      "position": 8,
+      "name": "Відвід 400×200 90°",
+      "product_type": "відвід прямокутний",
+      "dimensions": "400×200×300",
+      "material": "оцинкована сталь",
+      "thickness": 0.7,
+      "unit": "шт",
+      "quantity": 4,
+      "weight_per_unit": 1.8644,
+      "weight_total": 7.4576,
+      "area_per_unit": 0.3393,
+      "area_total": 1.3572,
+      "price_per_unit": 102.542,
+      "price_total": 410.168,
+      "notes": ""
+    },
+    {
+      "position": 9,
+      "name": "Заглушка 400×200",
+      "product_type": "заглушка прямокутна",
+      "dimensions": "400×200×25",
+      "material": "оцинкована сталь",
+      "thickness": 0.7,
+      "unit": "шт",
+      "quantity": 2,
+      "weight_per_unit": 0.6649,
+      "weight_total": 1.3298,
+      "area_per_unit": 0.121,
+      "area_total": 0.242,
+      "price_per_unit": 36.569500000000005,
+      "price_total": 73.13900000000001,
+      "notes": ""
+    }
+  ],
+  "by_type": [
+    {
+      "product_type": "повітропровід прямокутний",
+      "count": 2,
+      "total_quantity": 8,
+      "total_weight_kg": 117.279,
+      "total_area_m2": 18.6,
+      "total_price": 6450.35
+    },
+    {
+      "product_type": "повітропровід круглий",
+      "count": 1,
+      "total_quantity": 4,
+      "total_weight_kg": 51.789,
+      "total_area_m2": 9.4248,
+      "total_price": 2848.41
+    },
+    {
+      "product_type": "фланець прямокутний",
+      "count": 1,
+      "total_quantity": 10,
+      "total_weight_kg": 9.296,
+      "total_area_m2": 1.184,
+      "total_price": 511.28
+    },
+    {
+      "product_type": "фланець круглий",
+      "count": 1,
+      "total_quantity": 8,
+      "total_weight_kg": 1.618,
+      "total_area_m2": 0.2064,
+      "total_price": 88.97
+    },
+    {
+      "product_type": "трійник прямокутний",
+      "count": 1,
+      "total_quantity": 2,
+      "total_weight_kg": 20.149,
+      "total_area_m2": 2.852,
+      "total_price": 1108.22
+    },
+    {
+      "product_type": "перехід прямокутний",
+      "count": 1,
+      "total_quantity": 1,
+      "total_weight_kg": 4.352,
+      "total_area_m2": 0.616,
+      "total_price": 239.36
+    },
+    {
+      "product_type": "відвід прямокутний",
+      "count": 1,
+      "total_quantity": 4,
+      "total_weight_kg": 7.458,
+      "total_area_m2": 1.3572,
+      "total_price": 410.17
+    },
+    {
+      "product_type": "заглушка прямокутна",
+      "count": 1,
+      "total_quantity": 2,
+      "total_weight_kg": 1.33,
+      "total_area_m2": 0.242,
+      "total_price": 73.14
+    }
+  ],
+  "by_material": [
+    {
+      "material": "оцинкована сталь",
+      "thickness_mm": 0.7,
+      "total_quantity": 15,
+      "total_weight_kg": 110.032,
+      "total_area_m2": 20.024,
+      "total_price": 6051.74
+    },
+    {
+      "material": "оцинкована сталь",
+      "thickness_mm": 0.9,
+      "total_quantity": 6,
+      "total_weight_kg": 92.325,
+      "total_area_m2": 13.068,
+      "total_price": 5077.9
+    },
+    {
+      "material": "оцинкована сталь",
+      "thickness_mm": 1.0,
+      "total_quantity": 18,
+      "total_weight_kg": 10.914,
+      "total_area_m2": 1.3904,
+      "total_price": 600.25
+    }
+  ]
+}

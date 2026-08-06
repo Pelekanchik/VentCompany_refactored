@@ -22,8 +22,10 @@ def run_gui():
 
 def run_cli():
     """Функція для запуску CLI."""
-    from ventilation_company.main_cli import main as cli_main
-
+    try:
+        from ventilation_company.main_cli import main as cli_main
+    except ImportError:
+        from main_cli import main as cli_main
     cli_main()
 
 
@@ -31,4 +33,4 @@ if __name__ == "__main__":
     if "--cli" in sys.argv or "-c" in sys.argv:
         run_cli()
     else:
-        run_gui()
+        run_new_gui()

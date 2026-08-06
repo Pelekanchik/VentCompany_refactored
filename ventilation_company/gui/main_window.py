@@ -1,269 +1,176 @@
-#!/usr/bin/env python3
 """
-Головне вікно VentCompany.
+Головне вікно додатку VentCompany з усіма вкладками.
+Об'єднує: Вироби, Специфікацію, Розкрій, Проєкти (БД).
 """
 
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from ventilation_company.database import init_database
-
-from .accounting_tab import AccountingTab
-from .analytics_tab import AnalyticsTab
-from .archive_tab import ArchiveTab
-from .cad_tab import CADTab
-from .camduct_tab import CamDuctTab
-from .components_tab import ComponentsTab
-from .materials_tab import MaterialsTab
-from .price_list_tab import PriceListTab
-
-# Вкладки
-from .projects_tab import ProjectsTab
-from .works_tab import WorksTab
+from ventilation_company.db_integration import ProjectDatabase, save_project_full
+from ventilation_company.gui.cutting_tab import CuttingTab
+from ventilation_company.gui.products_tab import ProductsTab
+from ventilation_company.gui.specification_tab import SpecificationTab
 
 
-class VentilationApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("ВЕНТИЛЯЦІЙНА ВИРОБНИЧА ФІРМА — Система управління")
-        self.root.geometry("1920x1080")
-        self.root.state("zoomed")
-        self.root.minsize(1400, 900)
+class MainWindow:
+    """Головне вікно програми."""
 
-        self.themes = {
-            "Світла": {
-                "bg": "#f0f0f0",
-                "fg": "#333333",
-                "sidebar": "#2c3e50",
-                "sidebar_fg": "white",
-                "accent": "#3498db",
-                "card": "white",
-            },
-            "Темна": {
-                "bg": "#1a1a2e",
-                "fg": "#eaeaea",
-                "sidebar": "#16213e",
-                "sidebar_fg": "#eaeaea",
-                "accent": "#e94560",
-                "card": "#0f3460",
-            },
-            "Зелена": {
-                "bg": "#e8f5e9",
-                "fg": "#1b5e20",
-                "sidebar": "#2e7d32",
-                "sidebar_fg": "white",
-                "accent": "#66bb6a",
-                "card": "#c8e6c9",
-            },
-            "Синя": {
-                "bg": "#e3f2fd",
-                "fg": "#0d47a1",
-                "sidebar": "#1565c0",
-                "sidebar_fg": "white",
-                "accent": "#42a5f5",
-                "card": "#bbdefb",
-            },
-            "Помаранчева": {
-                "bg": "#fff3e0",
-                "fg": "#e65100",
-                "sidebar": "#ef6c00",
-                "sidebar_fg": "white",
-                "accent": "#ff9800",
-                "card": "#ffe0b2",
-            },
-        }
-        self.current_theme = "Світла"
-        self.colors = self.themes[self.current_theme]
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("🏭 VentCompany — Вентиляційні системи")
+        self.root.geometry("1400x900")
+        self.root.minsize(1200, 700)
 
-        init_database()
-        self.create_menu()
-        self.create_sidebar()
-        self.create_content_area()
-        self.show_tab("projects", "УПРАВЛІННЯ ПРОЕКТАМИ ВЕНТИЛЯЦІЇ")
+        self.db = ProjectDatabase("data/company.db")
+        self.current_project_id = None
 
-    def apply_theme(self):
-        c = self.colors
-        self.root.configure(bg=c["bg"])
-        self.sidebar_frame.configure(bg=c["sidebar"])
-        self.content_frame.configure(bg=c["bg"])
-        for btn in self.sidebar_buttons:
-            btn.configure(
-                bg=c["sidebar"],
-                fg=c["sidebar_fg"],
-                activebackground=c["accent"],
-                activeforeground="white",
-            )
-        self.header_label.configure(bg=c["bg"], fg=c["fg"])
-        for frame in self.tabs.values():
-            frame.configure(bg=c["bg"])
-            for child in frame.winfo_children():
-                if isinstance(child, tk.Frame):
-                    child.configure(bg=c["bg"])
-                elif isinstance(child, tk.Label):
-                    child.configure(bg=c["bg"], fg=c["fg"])
-                elif isinstance(child, ttk.Frame):
-                    for subchild in child.winfo_children():
-                        if isinstance(subchild, tk.Label):
-                            subchild.configure(bg=c["bg"], fg=c["fg"])
+        self._build_menu()
+        self._build_ui()
 
-    def create_menu(self):
+    def _build_menu(self):
         menubar = tk.Menu(self.root)
         self.root.config(menu=menubar)
 
-        theme_menu = tk.Menu(menubar, tearoff=0)
-        for theme_name in self.themes:
-            theme_menu.add_command(
-                label=theme_name, command=lambda t=theme_name: self.change_theme(t)
-            )
-        menubar.add_cascade(label="Тема", menu=theme_menu)
-
-        action_menu = tk.Menu(menubar, tearoff=0)
-        action_menu.add_command(label="Повний звіт", command=self.generate_full_report)
-        action_menu.add_command(label="Аналітична панель", command=self.show_analytics)
-        action_menu.add_separator()
-        action_menu.add_command(label="Вихід", command=self.root.quit)
-        menubar.add_cascade(label="Дії", menu=action_menu)
+        project_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Проєкт", menu=project_menu)
+        project_menu.add_command(label="💾 Зберегти в БД", command=self._save_project)
+        project_menu.add_command(label="📂 Відкрити проєкт", command=self._load_project)
+        project_menu.add_separator()
+        project_menu.add_command(label="🚪 Вихід", command=self.root.quit)
 
         help_menu = tk.Menu(menubar, tearoff=0)
-        help_menu.add_command(label="Про програму", command=self.show_about)
         menubar.add_cascade(label="Довідка", menu=help_menu)
+        help_menu.add_command(label="Про програму", command=self._show_about)
 
-    def change_theme(self, theme_name):
-        self.current_theme = theme_name
-        self.colors = self.themes[theme_name]
-        self.apply_theme()
-        if hasattr(self, "_current_tab_name") and self._current_tab_name in self.tabs:
-            tab = self.tabs[self._current_tab_name]
-            if hasattr(tab, "refresh"):
-                tab.refresh()
-        messagebox.showinfo("Тему змінено", f"Встановлено тему: {theme_name}")
+    def _build_ui(self):
+        top_frame = ttk.Frame(self.root, padding=5)
+        top_frame.pack(fill=tk.X)
 
-    def create_sidebar(self):
-        c = self.colors
-        self.sidebar_frame = tk.Frame(self.root, bg=c["sidebar"], width=250)
-        self.sidebar_frame.pack(side=tk.LEFT, fill=tk.Y)
-        self.sidebar_frame.pack_propagate(False)
-
-        logo_label = tk.Label(
-            self.sidebar_frame,
-            text="ВЕНТ-ФІРМА",
-            bg=c["sidebar"],
-            fg=c["sidebar_fg"],
-            font=("Arial", 20, "bold"),
-            pady=20,
+        ttk.Label(top_frame, text="📁 Проєкт:", font=("Arial", 10, "bold")).pack(side=tk.LEFT)
+        self.project_label = ttk.Label(
+            top_frame, text="Новий проєкт (не збережено)", foreground="#666"
         )
-        logo_label.pack(fill=tk.X)
+        self.project_label.pack(side=tk.LEFT, padx=5)
 
-        tk.Frame(self.sidebar_frame, bg=c["accent"], height=2).pack(fill=tk.X, padx=10)
-
-        self.sidebar_buttons = []
-        tabs_config = [
-            ("Проекти", "projects", "УПРАВЛІННЯ ПРОЕКТАМИ ВЕНТИЛЯЦІЇ"),
-            ("Вироби", "components", "КАТАЛОГ ВИРОБІВ ТА КОМПОНЕНТІВ"),
-            ("Роботи", "works", "УПРАВЛІННЯ РОБОТАМИ"),
-            ("Бухгалтерія", "accounting", "БУХГАЛТЕРСЬКИЙ ОБЛІК"),
-            ("Архів", "archive", "АРХІВ ПРОЕКТІВ"),
-            ("Аналітика", "analytics", "АНАЛІТИЧНА ПАНЕЛЬ"),
-            ("Розкрій листа", "camduct", "РОЗКРІЙ ЛИСТОВОГО МЕТАЛУ"),
-            ("Креслення", "cad", "2D CAD — КРЕСЛЕННЯ ДЕТАЛЕЙ"),
-            ("Прайс-лист", "price_list", "ПРАЙС-ЛИСТ ВИРОБІВ"),
-        ]
-
-        for text, tab_id, title in tabs_config:
-            btn = tk.Button(
-                self.sidebar_frame,
-                text=text,
-                bg=c["sidebar"],
-                fg=c["sidebar_fg"],
-                font=("Arial", 12),
-                activebackground=c["accent"],
-                activeforeground="white",
-                bd=0,
-                pady=12,
-                cursor="hand2",
-                command=lambda tid=tab_id, ttl=title: self.show_tab(tid, ttl),
-            )
-            btn.pack(fill=tk.X, padx=10, pady=2)
-            self.sidebar_buttons.append(btn)
-
-        tk.Frame(self.sidebar_frame, bg=c["accent"], height=2).pack(fill=tk.X, padx=10, pady=10)
-
-        self.status_label = tk.Label(
-            self.sidebar_frame,
-            text="Система активна",
-            bg=c["sidebar"],
-            fg=c["sidebar_fg"],
-            font=("Arial", 9),
-            pady=10,
+        ttk.Button(top_frame, text="💾 Зберегти проєкт", command=self._save_project).pack(
+            side=tk.RIGHT, padx=5
         )
-        self.status_label.pack(side=tk.BOTTOM, fill=tk.X)
 
-    def create_content_area(self):
-        c = self.colors
-        self.content_frame = tk.Frame(self.root, bg=c["bg"])
-        self.content_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.notebook = ttk.Notebook(self.root)
+        self.notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # Заголовок прибрано для економії місця
-        self.header_label = tk.Label(self.content_frame, text="", bg=c["bg"], height=1)
-        self.header_label.pack(fill=tk.X)
+        self.products_tab = ProductsTab(
+            self.notebook, on_products_changed=self._on_products_changed
+        )
+        self.spec_tab = SpecificationTab(self.notebook, get_products_callback=self._get_products)
+        self.cutting_tab = CuttingTab(self.notebook, get_products_callback=self._get_products)
 
-        self.tabs_container = tk.Frame(self.content_frame, bg=c["bg"])
-        self.tabs_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+        self.status_bar = ttk.Label(self.root, text="Готово", relief=tk.SUNKEN, anchor=tk.W)
+        self.status_bar.pack(fill=tk.X, side=tk.BOTTOM)
 
-        self.tabs = {}
-        self._tab_classes = {
-            "projects": ProjectsTab,
-            "components": ComponentsTab,
-            "works": WorksTab,
-            "materials": MaterialsTab,
-            "accounting": AccountingTab,
-            "archive": ArchiveTab,
-            "analytics": AnalyticsTab,
-            "camduct": CamDuctTab,
-            "cad": CADTab,
-            "price_list": PriceListTab,
-        }
+    def _get_products(self):
+        return self.products_tab.get_products_dict()
 
-    def show_tab(self, tab_name, title):
-        # Заголовок прибрано
-        self._current_tab_name = tab_name
+    def _on_products_changed(self):
+        self.status_bar.config(text=f"Виробів: {len(self.products_tab.get_library())}")
 
-        for _name, frame in self.tabs.items():
-            frame.pack_forget()
+    def _save_project(self):
+        products = self._get_products()
+        if not products:
+            messagebox.showwarning("Увага", "Додайте хоча б один виріб.")
+            return
 
-        if tab_name not in self.tabs:
-            tab_class = self._tab_classes[tab_name]
-            self.tabs[tab_name] = tab_class(self.tabs_container, self)
+        project_name = self.spec_tab.project_name_var.get()
 
-        tab = self.tabs[tab_name]
-        tab.pack(fill=tk.BOTH, expand=True)
-        if hasattr(tab, "refresh"):
-            tab.refresh()
-
-        self.status_label.config(text=f"Активна вкладка: {title}")
-
-    def generate_full_report(self):
         try:
-            from ventilation_company.archive.reports import ReportGenerator
+            self.spec_tab._generate()
+            spec = self.spec_tab.get_specification()
 
-            gen = ReportGenerator()
-            report = gen.generate_full_report()
-            messagebox.showinfo("Звіт згенеровано", f"Звіт збережено:\n{report}")
+            self.cutting_tab._calculate()
+            plan = self.cutting_tab.get_plan()
+
+            spec_data = spec.to_dict() if spec else None
+            plan_data = plan.to_dict() if plan else None
+
+            result = save_project_full(
+                project_name=project_name,
+                products=products,
+                spec_data=spec_data,
+                cutting_plan=plan_data,
+                db_path="data/company.db",
+            )
+
+            self.current_project_id = result["project_id"]
+            self.project_label.config(
+                text=f"{project_name} (ID: {self.current_project_id})", foreground="green"
+            )
+            self.status_bar.config(text=f"✅ Проєкт збережено. ID: {self.current_project_id}")
+            messagebox.showinfo("Успіх", f"Проєкт збережено!\nID: {self.current_project_id}")
+
         except Exception as e:
-            messagebox.showerror("Помилка", f"Не вдалося згенерувати звіт: {e}")
+            messagebox.showerror("Помилка", f"Не вдалося зберегти:\n{str(e)}")
 
-    def show_analytics(self):
-        self.show_tab("analytics", "АНАЛІТИЧНА ПАНЕЛЬ")
+    def _load_project(self):
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Відкрити проєкт")
+        dialog.geometry("500x400")
 
-    def show_about(self):
+        ttk.Label(dialog, text="Оберіть проєкт:").pack(pady=5)
+
+        listbox = tk.Listbox(dialog, height=15)
+        listbox.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        projects = self.db.get_all_projects()
+        for p in projects:
+            listbox.insert(tk.END, f"[{p['id']}] {p['name']} — {p['created_at']}")
+
+        def on_select():
+            sel = listbox.curselection()
+            if sel:
+                idx = sel[0]
+                project_id = projects[idx]["id"]
+                self._load_project_data(project_id)
+                dialog.destroy()
+
+        ttk.Button(dialog, text="Відкрити", command=on_select).pack(pady=5)
+
+    def _load_project_data(self, project_id: int):
+        project = self.db.get_project(project_id)
+        if not project:
+            return
+
+        self.spec_tab.project_name_var.set(project["name"])
+        self.project_label.config(text=f"{project['name']} (ID: {project_id})")
+
+        products = self.db.get_project_products(project_id)
+        self.products_tab.library.clear()
+        self.products_tab._refresh_tree()
+        self.products_tab._update_summary()
+
+        self.current_project_id = project_id
+        self.status_bar.config(text=f"📂 Завантажено проєкт ID: {project_id}")
+        messagebox.showinfo("Успіх", f"Проєкт '{project['name']}' завантажено.")
+
+    def _show_about(self):
         messagebox.showinfo(
             "Про програму",
-            "VentCompany v2.0\n"
-            "Система управління вентиляційною фірмою\n\n"
-            "Можливості:\n"
-            "• Управління проектами\n"
-            "• Калькуляція витрат\n"
-            "• Розкрій листового металу\n"
-            "• 2D CAD редактор\n"
-            "• Архів та аналітика",
+            "🏭 VentCompany\n"
+            "Система управління вентиляційними проєктами\n\n"
+            "Модулі:\n"
+            "• Бібліотека стандартних виробів\n"
+            "• Автоматичний розкрій металу\n"
+            "• Специфікація з експортом\n"
+            "• Інтеграція з базою даних",
         )
+
+    def run(self):
+        self.root.mainloop()
+
+
+def main():
+    app = MainWindow()
+    app.run()
+
+
+if __name__ == "__main__":
+    main()
