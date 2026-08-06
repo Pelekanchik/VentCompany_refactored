@@ -399,6 +399,3 @@ class ProjectsTab(BaseTab):
         """Відкрити вкладку Креслення (новий CAD)"""
         self.app.show_tab("cad", "2D CAD — КРЕСЛЕННЯ ДЕТАЛЕЙ")
 
-    def open_project_drawing(self):
-        """Відкрити креслення (тепер через новий CAD)"""
-        self.open_cad_tab()

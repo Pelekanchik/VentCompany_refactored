@@ -11,8 +11,7 @@ import sys
 def run_gui():
     """Функція для запуску GUI."""
     try:
-        from ventilation_company.gui import main as gui_main
-
+        from ventilation_company.gui.main_window import main as gui_main
         gui_main()
     except ImportError as e:
         print(f"Помилка запуску GUI: {e}")
@@ -33,4 +32,4 @@ if __name__ == "__main__":
     if "--cli" in sys.argv or "-c" in sys.argv:
         run_cli()
     else:
-        run_new_gui()
+        run_gui()
