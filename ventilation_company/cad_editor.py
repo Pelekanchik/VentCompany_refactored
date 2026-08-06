@@ -7,6 +7,20 @@ import math
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+# --- FreeCAD інтеграція ---
+try:
+    from .freecad_exporter import FREECAD_AVAILABLE, FreeCADExporter, check_freecad
+except ImportError:
+    try:
+        from freecad_exporter import FREECAD_AVAILABLE, FreeCADExporter, check_freecad
+    except ImportError:
+        FREECAD_AVAILABLE = False
+        FreeCADExporter = None
+
+        def check_freecad():
+            return False
+
+
 # ===================== geometry =====================
 
 
@@ -1950,6 +1964,24 @@ class CADEditorFrame(tk.Frame):
         )
         btn_dxf.pack(side=tk.RIGHT, padx=2)
         _Tooltip(btn_dxf, "Експорт DXF", "Експортувати креслення у DXF")
+
+        # --- КНОПКА FREECAD ---
+        fcad_color = "#1f4e79" if FREECAD_AVAILABLE else "#7f8c8d"
+        btn_freecad = tk.Button(
+            toolbar,
+            text="🏗",
+            bg=fcad_color,
+            fg="white",
+            font=("Segoe UI", 10, "bold"),
+            bd=0,
+            width=4,
+            command=self.export_freecad,
+        )
+        btn_freecad.pack(side=tk.RIGHT, padx=2)
+        if FREECAD_AVAILABLE:
+            _Tooltip(btn_freecad, "Експорт FreeCAD", "Експортувати креслення у FreeCAD .FCStd")
+        else:
+            _Tooltip(btn_freecad, "FreeCAD недоступний", "Встановіть FreeCAD для 3D експорту")
         btn_clear = tk.Button(
             toolbar,
             text="🗑",
@@ -3531,6 +3563,64 @@ class CADEditorFrame(tk.Frame):
         if path:
             self.cad.export_dxf(path)
             self.status_label.config(text=f"Експортовано DXF: {path}")
+
+    def export_freecad(self):
+        """Експорт креслення у FreeCAD .FCStd"""
+        if not FREECAD_AVAILABLE:
+            messagebox.showwarning(
+                "FreeCAD не встановлено",
+                "Для експорту у FreeCAD потрібно встановити його:\n"
+                "\nLinux: sudo apt install freecad"
+                "\nWindows: https://www.freecadweb.org/downloads.php",
+            )
+            return
+
+        if not self.cad.entities:
+            messagebox.showinfo("Порожнє креслення", "Немає об'єктів для експорту")
+            return
+
+        path = filedialog.asksaveasfilename(
+            defaultextension=".FCStd",
+            filetypes=[("FreeCAD", "*.FCStd"), ("DXF", "*.dxf")],
+            title="Експорт у FreeCAD",
+        )
+        if not path:
+            return
+
+        try:
+            exporter = FreeCADExporter()
+            if path.lower().endswith(".dxf"):
+                exporter.export_to_dxf(self.cad.entities, path)
+            else:
+                exporter.export_entities(self.cad.entities, path)
+            exporter.close()
+            self.status_label.config(text=f"✅ Експортовано у FreeCAD: {path}")
+
+            # Пропонуємо відкрити у FreeCAD
+            if messagebox.askyesno("Відкрити FreeCAD?", "Відкрити файл у FreeCAD?"):
+                self._open_in_freecad(path)
+
+        except Exception as e:
+            messagebox.showerror("Помилка експорту", f"Не вдалося експортувати:\n{str(e)}")
+            self.status_label.config(text=f"❌ Помилка експорту: {e}")
+
+    def _open_in_freecad(self, filepath):
+        """Відкрити файл у зовнішньому FreeCAD"""
+        import platform
+        import subprocess
+
+        system = platform.system()
+        try:
+            if system == "Windows":
+                subprocess.Popen(["freecad.exe", filepath], shell=True)
+            else:
+                subprocess.Popen(["freecad", filepath])
+            self.status_label.config(text="🖥️ FreeCAD запущено")
+        except FileNotFoundError:
+            messagebox.showwarning(
+                "FreeCAD не знайдено",
+                "Не вдалося знайти команду 'freecad'.\n" "Відкрийте файл вручну.",
+            )
 
     def clear_drawing(self):
         if messagebox.askyesno("Очистити", "Ви впевнені, що хочете очистити креслення?"):

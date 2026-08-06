@@ -4,6 +4,12 @@
 import tkinter as tk
 from tkinter import messagebox, ttk
 
+try:
+    from ventilation_company.freecad_exporter import FREECAD_AVAILABLE
+except ImportError:
+    FREECAD_AVAILABLE = False
+
+
 from ventilation_company.calculations.cost_calculator import CostCalculator
 from ventilation_company.config import DB_PATH, VENTILATION_TYPES
 from ventilation_company.database import execute_query
@@ -69,13 +75,34 @@ class ProjectsTab(BaseTab):
             font=("Arial", 11),
             command=self.export_selected_project,
         ).pack(side=tk.LEFT, padx=5)
+        # === КНОПКА РЕЗУЛЬТАТИ З ПІДМЕНЮ ===
+        btn_results = tk.Menubutton(
+            btn_frame,
+            text="📊 Результати ▼",
+            bg="#3498db",
+            fg="white",
+            font=("Arial", 11),
+            relief=tk.RAISED,
+            cursor="hand2",
+        )
+        btn_results.pack(side=tk.LEFT, padx=5)
+
+        results_menu = tk.Menu(btn_results, tearoff=0, bg="white", font=("Arial", 10))
+        results_menu.add_command(label="📋 Специфікація", command=self.show_specification)
+        results_menu.add_command(label="📐 Креслення 2D", command=self.open_cad_tab)
+        results_menu.add_command(label="🏗 3D Модель (FreeCAD)", command=self.export_freecad_model)
+        results_menu.add_separator()
+        results_menu.add_command(label="💰 Кошторис", command=self.show_estimate)
+        results_menu.add_command(label="📤 Експорт у PDF", command=self.export_pdf)
+        btn_results.config(menu=results_menu)
+
         tk.Button(
             btn_frame,
             text="📐 Креслення",
             bg="#1abc9c",
             fg="white",
             font=("Arial", 11),
-            command=self.open_project_drawing,
+            command=self.open_cad_tab,
         ).pack(side=tk.LEFT, padx=5)
 
         columns = ("ID", "Номер", "Назва", "Замовник", "Тип", "Витрата", "Тиск", "Дата")
@@ -367,3 +394,11 @@ class ProjectsTab(BaseTab):
             font=("Arial", 12, "bold"),
             command=save_changes,
         ).pack(pady=10)
+
+    def open_cad_tab(self):
+        """Відкрити вкладку Креслення (новий CAD)"""
+        self.app.show_tab("cad", "2D CAD — КРЕСЛЕННЯ ДЕТАЛЕЙ")
+
+    def open_project_drawing(self):
+        """Відкрити креслення (тепер через новий CAD)"""
+        self.open_cad_tab()
