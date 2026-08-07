@@ -1,5 +1,4 @@
-"""
-Вкладка "Специфікація" для GUI.
+"""Вкладка "Специфікація" для GUI.
 Формує, відображає та експортує специфікацію виробів проєкту.
 """
 
@@ -53,6 +52,7 @@ class SpecificationTab:
         ).pack(side=tk.LEFT, padx=2)
         ttk.Button(ctrl_frame, text="💾 Зберегти", command=self._export).pack(side=tk.LEFT, padx=2)
 
+        # Основна таблиця
         columns = (
             "pos",
             "name",
@@ -108,8 +108,9 @@ class SpecificationTab:
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=5)
 
-        self.summary_frame = ttk.LabelFrame(self.frame, text="Підсумки", padding=10)
-        self.summary_frame.pack(fill=tk.X, padx=5, pady=5, side=tk.BOTTOM)
+        # Підсумки — компактно в один рядок
+        self.summary_frame = ttk.LabelFrame(self.frame, text="📊 Підсумки", padding=5)
+        self.summary_frame.pack(fill=tk.X, padx=5, pady=2, side=tk.BOTTOM)
 
         self.summary_labels = {}
         summary_items = [
@@ -121,9 +122,11 @@ class SpecificationTab:
         ]
 
         for i, (key, text) in enumerate(summary_items):
-            ttk.Label(self.summary_frame, text=text).grid(row=0, column=i * 2, padx=5)
+            ttk.Label(self.summary_frame, text=text, font=("Arial", 9)).grid(
+                row=0, column=i * 2, padx=(10 if i > 0 else 5), pady=2
+            )
             lbl = ttk.Label(self.summary_frame, text="0", font=("Arial", 10, "bold"))
-            lbl.grid(row=0, column=i * 2 + 1, padx=5)
+            lbl.grid(row=0, column=i * 2 + 1, padx=2, pady=2)
             self.summary_labels[key] = lbl
 
     def _generate(self):

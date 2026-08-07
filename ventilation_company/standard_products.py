@@ -1,5 +1,4 @@
-"""
-Бібліотека стандартних виробів для вентиляційних систем.
+"""Бібліотека стандартних виробів для вентиляційних систем.
 Фланці, трійники, переходи, відводи, заглушки — готові параметричні блоки
 з автоматичним розрахунком площі металу та ваги.
 """
@@ -98,22 +97,15 @@ class RectFlange(StandardProduct):
         super().__post_init__()
 
     def calculate_metal_area(self) -> float:
-        # Периметр фланця = периметр повітропроводу + полки з 4 сторін
         w = self.width / 1000
         h = self.height / 1000
         border = self.flange_border / 1000
-
-        # Площа фланця = (W + 2*border) * (H + 2*border)
         flange_w = w + 2 * border
         flange_h = h + 2 * border
         area = flange_w * flange_h
-
-        # Мінус площа отворів під болти
         bolts_x = int((self.width + 2 * self.flange_border) / self.bolt_spacing) + 1
         bolts_y = int((self.height + 2 * self.flange_border) / self.bolt_spacing) + 1
         bolt_area = bolts_x * bolts_y * math.pi * (self.bolt_diameter / 2000) ** 2
-
-        # Додатково: площа під гумовий ущільнювач (рахується окремо як комплектуюче)
         return max(0, area - bolt_area)
 
 
@@ -130,16 +122,11 @@ class RoundFlange(StandardProduct):
         super().__post_init__()
 
     def calculate_metal_area(self) -> float:
-        # Діаметр = height (для круглих використовуємо height як діаметр)
         d = self.height / 1000
         border = self.flange_width / 1000
-
-        # Площа кільця = π*(R² - r²)
-        R = (d / 2) + border
+        r_outer = (d / 2) + border
         r = d / 2
-        area = math.pi * (R**2 - r**2)
-
-        # Мінус отвори під болти
+        area = math.pi * (r_outer**2 - r**2)
         bolt_area = self.bolt_count * math.pi * (self.bolt_diameter / 2000) ** 2
         return max(0, area - bolt_area)
 
@@ -156,6 +143,7 @@ class RectTee(StandardProduct):
     branch_width: float = 0.0  # мм, ширина відгалуження
     branch_height: float = 0.0  # мм, висота відгалуження
     branch_length: float = 0.0  # мм, довжина відгалуження
+    branch_offset: float = 0.0  # мм, відстань від початку основного каналу до центру відгалуження
     angle: float = 90  # градуси, кут відгалуження
 
     def __post_init__(self):
@@ -163,20 +151,12 @@ class RectTee(StandardProduct):
         super().__post_init__()
 
     def calculate_metal_area(self) -> float:
-        # Основний канал
-        w, h, l = self.width / 1000, self.height / 1000, self.length / 1000
-        main_area = 2 * (w + h) * l
-
-        # Відгалуження
+        w, h, length = self.width / 1000, self.height / 1000, self.length / 1000
+        main_area = 2 * (w + h) * length
         bw, bh, bl = self.branch_width / 1000, self.branch_height / 1000, self.branch_length / 1000
         branch_area = 2 * (bw + bh) * bl
-
-        # Площа з'єднання (врізка) — прямокутник
         joint_area = bw * bh
-
-        # Припуск на згин (15%)
-        total = (main_area + branch_area - joint_area) * 1.15
-        return total
+        return (main_area + branch_area - joint_area) * 1.15
 
 
 @dataclass
@@ -185,6 +165,7 @@ class RoundTee(StandardProduct):
 
     branch_diameter: float = 0.0  # мм
     branch_length: float = 0.0  # мм
+    branch_offset: float = 0.0  # мм, відстань від початку основної труби до центру відгалуження
     angle: float = 90
 
     def __post_init__(self):
@@ -192,20 +173,13 @@ class RoundTee(StandardProduct):
         super().__post_init__()
 
     def calculate_metal_area(self) -> float:
-        d = self.height / 1000  # основний діаметр
+        d = self.height / 1000
         bd = self.branch_diameter / 1000
-        l = self.length / 1000
+        length = self.length / 1000
         bl = self.branch_length / 1000
-
-        # Основний канал
-        main_area = math.pi * d * l
-
-        # Відгалуження
+        main_area = math.pi * d * length
         branch_area = math.pi * bd * bl
-
-        # Врізка (площа перетину меншого)
         joint_area = math.pi * (min(d, bd) / 2) ** 2
-
         return (main_area + branch_area - joint_area) * 1.15
 
 
@@ -228,17 +202,11 @@ class RectTransition(StandardProduct):
     def calculate_metal_area(self) -> float:
         w1, h1 = self.width / 1000, self.height / 1000
         w2, h2 = self.end_width / 1000, self.end_height / 1000
-        l = self.length / 1000
-
-        # Середній периметр
+        length = self.length / 1000
         p1 = 2 * (w1 + h1)
         p2 = 2 * (w2 + h2)
         p_avg = (p1 + p2) / 2
-
-        # Площа бічної поверхні трапеції
-        area = p_avg * l
-
-        # Припуск на згин (10%)
+        area = p_avg * length
         return area * 1.10
 
 
@@ -255,14 +223,10 @@ class RoundTransition(StandardProduct):
     def calculate_metal_area(self) -> float:
         d1 = self.height / 1000
         d2 = self.end_diameter / 1000
-        l = self.length / 1000
-
-        # Площа бічної поверхні зрізаного конуса
-        # S = π * (r1 + r2) * sqrt(l² + (r1 - r2)²)
+        length = self.length / 1000
         r1, r2 = d1 / 2, d2 / 2
-        slant = math.sqrt(l**2 + (r1 - r2) ** 2)
+        slant = math.sqrt(length**2 + (r1 - r2) ** 2)
         area = math.pi * (r1 + r2) * slant
-
         return area * 1.10
 
 
@@ -287,14 +251,8 @@ class RectElbow(StandardProduct):
         w, h = self.width / 1000, self.height / 1000
         r = self.radius / 1000
         angle_rad = math.radians(self.angle)
-
-        # Довжина дуги
         arc_length = r * angle_rad
-
-        # Площа бічної поверхні
         area = 2 * (w + h) * arc_length
-
-        # Припуск на згин (20% — більше через складну геометрію)
         return area * 1.20
 
 
@@ -314,10 +272,8 @@ class RoundElbow(StandardProduct):
         d = self.height / 1000
         r = self.radius / 1000
         angle_rad = math.radians(self.angle)
-
         arc_length = r * angle_rad
         area = math.pi * d * arc_length
-
         return area * 1.20
 
 
@@ -334,17 +290,14 @@ class RectCap(StandardProduct):
 
     def __post_init__(self):
         self.product_type = "заглушка прямокутна"
-        self.length = self.flange_border  # для заглушки length = глибина загину
+        self.length = self.flange_border
         super().__post_init__()
 
     def calculate_metal_area(self) -> float:
         w, h = self.width / 1000, self.height / 1000
         border = self.flange_border / 1000
-
-        # Дно + 4 боковини
         bottom = w * h
         sides = 2 * (w + h) * border
-
         return (bottom + sides) * 1.10
 
 
@@ -363,16 +316,13 @@ class RoundCap(StandardProduct):
         d = self.height / 1000
         r = d / 2
         depth = self.depth / 1000
-
-        # Дно (коло) + бічна поверхня (циліндр)
         bottom = math.pi * r**2
         side = math.pi * d * depth
-
         return (bottom + side) * 1.10
 
 
 # =========================================================
-# СКРУБЕР / З'ЄДНУВАЧ
+# ГНУЧКА ВСТАВКА
 # =========================================================
 
 
@@ -387,17 +337,15 @@ class FlexibleConnector(StandardProduct):
         super().__post_init__()
 
     def calculate_metal_area(self) -> float:
-        # Гнучка вставка не з металу, але рахуємо площу тканини
-        w, h, l = self.width / 1000, self.height / 1000, self.length / 1000
-        return 2 * (w + h) * l
+        w, h, length = self.width / 1000, self.height / 1000, self.length / 1000
+        return 2 * (w + h) * length
 
     def calculate_weight(self) -> float:
-        # Приблизна вага тканини ~0.3 кг/м²
         return self.metal_area * 0.3
 
 
 # =========================================================
-# ФАБРИКА ВИРОБІВ
+# БІБЛІОТЕКА
 # =========================================================
 
 
@@ -433,7 +381,7 @@ class ProductLibrary:
             grouped[key]["product"] = p
 
         result = []
-        for key, data in grouped.items():
+        for _key, data in grouped.items():
             p = data["product"]
             result.append(
                 {
@@ -489,8 +437,8 @@ def make_rect_duct(
             super().__post_init__()
 
         def calculate_metal_area(self):
-            w, h, l = self.width / 1000, self.height / 1000, self.length / 1000
-            return 2 * (w + h) * l
+            w, h, length = self.width / 1000, self.height / 1000, self.length / 1000
+            return 2 * (w + h) * length
 
     return RectDuct(
         name=f"Повітропровід {width}×{height}",
@@ -524,8 +472,8 @@ def make_round_duct(
             super().__post_init__()
 
         def calculate_metal_area(self):
-            d, l = self.height / 1000, self.length / 1000
-            return math.pi * d * l
+            d, length = self.height / 1000, self.length / 1000
+            return math.pi * d * length
 
     return RoundDuct(
         name=f"Повітропровід Ø{diameter}",

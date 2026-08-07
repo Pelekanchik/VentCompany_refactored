@@ -1,5 +1,5 @@
 """Головне вікно додатку VentCompany з усіма вкладками.
-Об'єднує: Вироби, Специфікацію, Розкрій, Проєкти (БД), FreeCAD (3D), Ціноутворення.
+Об'єднує: Вироби, Специфікацію, Розкрій, Проєкти (БД), FreeCAD (3D).
 """
 
 import tkinter as tk
@@ -9,7 +9,6 @@ from ventilation_company.db_integration import ProjectDatabase, save_project_ful
 from ventilation_company.gui.cutting_tab import CuttingTab
 from ventilation_company.gui.freecad_tab import FreeCADTab
 from ventilation_company.gui.products_tab import ProductsTab
-from ventilation_company.gui.settings_tab import SettingsTab
 from ventilation_company.gui.specification_tab import SpecificationTab
 
 
@@ -73,13 +72,11 @@ class MainWindow:
         self.spec_tab = SpecificationTab(self.notebook, get_products_callback=self._get_products)
         self.cutting_tab = CuttingTab(self.notebook, get_products_callback=self._get_products)
         self.freecad_tab = FreeCADTab(self.notebook, get_products_callback=self._get_products)
-        self.settings_tab = SettingsTab(self.notebook)
 
         self.notebook.add(self.products_tab.frame, text="📦 Вироби")
         self.notebook.add(self.spec_tab.frame, text="📋 Специфікація")
         self.notebook.add(self.cutting_tab.frame, text="✂️ Розкрій")
         self.notebook.add(self.freecad_tab.frame, text="🏗️ FreeCAD 3D")
-        self.notebook.add(self.settings_tab.frame, text="💰 Ціноутворення")
 
         self.status_bar = ttk.Label(self.root, text="Готово", relief=tk.SUNKEN, anchor=tk.W)
         self.status_bar.pack(fill=tk.X, side=tk.BOTTOM)
@@ -169,6 +166,7 @@ class MainWindow:
         messagebox.showinfo("Успіх", f"Проєкт '{project['name']}' завантажено.")
 
     def _export_freecad(self):
+        """Швидкий експорт у FreeCAD з верхньої панелі."""
         self.notebook.select(self.freecad_tab.frame)
         self.freecad_tab._export_fcstd()
 
@@ -182,8 +180,7 @@ class MainWindow:
             "• Автоматичний розкрій металу\n"
             "• Специфікація з експортом\n"
             "• Інтеграція з базою даних\n"
-            "• 3D-моделі у FreeCAD (STEP, STL, FCStd)\n"
-            "• Ціноутворення з формулами",
+            "• 3D-моделі у FreeCAD (STEP, STL, FCStd)",
         )
 
     def run(self):

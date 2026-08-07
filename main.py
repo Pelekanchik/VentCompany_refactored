@@ -12,6 +12,7 @@ def run_gui():
     """Функція для запуску GUI."""
     try:
         from ventilation_company.gui.main_window import main as gui_main
+
         gui_main()
     except ImportError as e:
         print(f"Помилка запуску GUI: {e}")

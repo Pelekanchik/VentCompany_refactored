@@ -1,5 +1,4 @@
-"""
-Модуль автоматичної специфікації.
+"""Модуль автоматичної специфікації.
 Групування виробів, підрахунок, формування зведених таблиць,
 експорт у різні формати (JSON, CSV, TXT, HTML).
 """
@@ -49,7 +48,6 @@ class Specification:
 
     items: list[SpecItem] = field(default_factory=list)
 
-    # Підсумки
     @property
     def total_items(self) -> int:
         return len(self.items)
@@ -75,14 +73,12 @@ class Specification:
         self.items.append(item)
 
     def get_grouped_by_type(self) -> dict[str, list[SpecItem]]:
-        """Групування за типом виробу."""
         grouped = defaultdict(list)
         for item in self.items:
             grouped[item.product_type].append(item)
         return dict(grouped)
 
     def get_summary_by_type(self) -> list[dict]:
-        """Зведена таблиця за типами виробів."""
         grouped = self.get_grouped_by_type()
         result = []
         for ptype, items in grouped.items():
@@ -99,7 +95,6 @@ class Specification:
         return result
 
     def get_summary_by_material(self) -> list[dict]:
-        """Зведена таблиця за матеріалами."""
         grouped = defaultdict(lambda: {"quantity": 0, "weight": 0.0, "area": 0.0, "price": 0.0})
         for item in self.items:
             key = (item.material, item.thickness)
@@ -143,11 +138,8 @@ class Specification:
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=indent)
 
     def to_csv(self) -> str:
-        """Експорт у CSV."""
         output = io.StringIO()
         writer = csv.writer(output)
-
-        # Заголовок
         writer.writerow(
             [
                 "№",
@@ -167,7 +159,6 @@ class Specification:
                 "Примітки",
             ]
         )
-
         for item in self.items:
             writer.writerow(
                 [
@@ -188,8 +179,6 @@ class Specification:
                     item.notes,
                 ]
             )
-
-        # Підсумок
         writer.writerow([])
         writer.writerow(
             [
@@ -210,11 +199,9 @@ class Specification:
                 "",
             ]
         )
-
         return output.getvalue()
 
     def to_txt(self) -> str:
-        """Експорт у текстовий формат."""
         lines = []
         lines.append("=" * 100)
         lines.append(f"СПЕЦИФІКАЦІЯ: {self.project_name}")
@@ -223,12 +210,9 @@ class Specification:
             lines.append(f"ID проєкту: {self.project_id}")
         lines.append("=" * 100)
         lines.append("")
-
-        # Шапка таблиці
         header = f"{'№':<4} {'Найменування':<25} {'Тип':<20} {'Розміри':<15} {'Мат.':<12} {'Товщ.':<6} {'Од.':<4} {'К-ть':<6} {'Вага, кг':<10} {'Площа, м²':<10} {'Ціна, грн':<10}"
         lines.append(header)
         lines.append("-" * 100)
-
         for item in self.items:
             line = (
                 f"{item.position:<4} {item.name:<25} {item.product_type:<20} "
@@ -237,36 +221,32 @@ class Specification:
                 f"{item.area_total:<10.4f} {item.price_total:<10.2f}"
             )
             lines.append(line)
-
         lines.append("-" * 100)
         lines.append(
-            f"{'':>70} ВСЬОГО: {self.total_quantity:<6} {self.total_weight:<10.3f} {self.total_area:<10.4f} {self.total_price:<10.2f}"
+            f"{'':>70} ВСЬОГО: {self.total_quantity:<6} {self.total_weight:<10.3f} "
+            f"{self.total_area:<10.4f} {self.total_price:<10.2f}"
         )
         lines.append("")
-
-        # Зведення за типами
         lines.append("ЗВЕДЕННЯ ЗА ТИПАМИ ВИРОБІВ:")
         lines.append("-" * 60)
         for s in self.get_summary_by_type():
             lines.append(
-                f"  {s['product_type']:<30} к-ть: {s['total_quantity']:<5} вага: {s['total_weight_kg']:<8.2f} кг  площа: {s['total_area_m2']:<8.3f} м²"
+                f" {s['product_type']:<30} к-ть: {s['total_quantity']:<5} "
+                f"вага: {s['total_weight_kg']:<8.2f} кг площа: {s['total_area_m2']:<8.3f} м²"
             )
-
         lines.append("")
         lines.append("ЗВЕДЕННЯ ЗА МАТЕРІАЛАМИ:")
         lines.append("-" * 60)
         for s in self.get_summary_by_material():
             lines.append(
-                f"  {s['material']} {s['thickness_mm']} мм: к-ть {s['total_quantity']} шт, вага {s['total_weight_kg']:.2f} кг, площа {s['total_area_m2']:.3f} м²"
+                f" {s['material']} {s['thickness_mm']} мм: к-ть {s['total_quantity']} шт, "
+                f"вага {s['total_weight_kg']:.2f} кг, площа {s['total_area_m2']:.3f} м²"
             )
-
         lines.append("")
         lines.append("=" * 100)
-
         return "\n".join(lines)
 
     def to_html(self) -> str:
-        """Експорт у HTML для друку/перегляду."""
         rows = ""
         for item in self.items:
             rows += f"""
@@ -286,114 +266,65 @@ class Specification:
                 <td>{item.price_per_unit:.2f}</td>
                 <td>{item.price_total:.2f}</td>
                 <td>{html.escape(item.notes)}</td>
-            </tr>"""
-
+            </tr>
+            """
         by_type_rows = ""
         for s in self.get_summary_by_type():
             by_type_rows += f"""
-            <tr>
-                <td>{html.escape(s['product_type'])}</td>
-                <td>{s['count']}</td>
-                <td>{s['total_quantity']}</td>
-                <td>{s['total_weight_kg']:.3f}</td>
-                <td>{s['total_area_m2']:.4f}</td>
-                <td>{s['total_price']:.2f}</td>
-            </tr>"""
-
+            <tr><td>{html.escape(s['product_type'])}</td><td>{s['count']}</td>
+            <td>{s['total_quantity']}</td><td>{s['total_weight_kg']:.3f}</td>
+            <td>{s['total_area_m2']:.4f}</td><td>{s['total_price']:.2f}</td></tr>
+            """
         by_mat_rows = ""
         for s in self.get_summary_by_material():
             by_mat_rows += f"""
-            <tr>
-                <td>{html.escape(s['material'])}</td>
-                <td>{s['thickness_mm']}</td>
-                <td>{s['total_quantity']}</td>
-                <td>{s['total_weight_kg']:.3f}</td>
-                <td>{s['total_area_m2']:.4f}</td>
-                <td>{s['total_price']:.2f}</td>
-            </tr>"""
+            <tr><td>{html.escape(s['material'])}</td><td>{s['thickness_mm']}</td>
+            <td>{s['total_quantity']}</td><td>{s['total_weight_kg']:.3f}</td>
+            <td>{s['total_area_m2']:.4f}</td><td>{s['total_price']:.2f}</td></tr>
+            """
 
-        return f"""<!DOCTYPE html>
-<html lang="uk">
-<head>
-    <meta charset="UTF-8">
-    <title>Специфікація — {html.escape(self.project_name)}</title>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 40px; color: #333; }}
-        h1, h2 {{ color: #2c3e50; }}
-        table {{ border-collapse: collapse; width: 100%; margin: 20px 0; font-size: 13px; }}
-        th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-        th {{ background: #3498db; color: white; }}
-        tr:nth-child(even) {{ background: #f9f9f9; }}
-        .summary {{ background: #ecf0f1; padding: 15px; border-radius: 5px; margin: 20px 0; }}
-        .total {{ font-weight: bold; background: #e8f4f8 !important; }}
-        @media print {{ body {{ margin: 10px; }} }}
-    </style>
-</head>
-<body>
-    <h1>🏭 Специфікація виробів</h1>
-    <p><strong>Проєкт:</strong> {html.escape(self.project_name)}</p>
-    <p><strong>Дата:</strong> {self.created_at}</p>
-    {f'<p><strong>ID:</strong> {self.project_id}</p>' if self.project_id else ''}
-
-    <div class="summary">
-        <strong>Загальні підсумки:</strong>
-        Позицій: {self.total_items} |
-        Кількість: {self.total_quantity} шт |
-        Вага: {self.total_weight:.3f} кг |
-        Площа: {self.total_area:.4f} м² |
-        Вартість: {self.total_price:.2f} грн
-    </div>
-
-    <h2>📋 Детальна специфікація</h2>
-    <table>
-        <thead>
-            <tr>
-                <th>№</th><th>Найменування</th><th>Тип</th><th>Розміри</th>
-                <th>Матеріал</th><th>Товщ.</th><th>Од.</th><th>К-ть</th>
-                <th>Вага 1 шт</th><th>Вага заг.</th>
-                <th>Площа 1 шт</th><th>Площа заг.</th>
-                <th>Ціна 1 шт</th><th>Ціна заг.</th><th>Примітки</th>
-            </tr>
-        </thead>
-        <tbody>
-            {rows}
-            <tr class="total">
-                <td colspan="7" style="text-align:right"><strong>ВСЬОГО:</strong></td>
-                <td><strong>{self.total_quantity}</strong></td>
-                <td></td><td><strong>{self.total_weight:.4f}</strong></td>
-                <td></td><td><strong>{self.total_area:.4f}</strong></td>
-                <td></td><td><strong>{self.total_price:.2f}</strong></td>
-                <td></td>
-            </tr>
-        </tbody>
-    </table>
-
-    <h2>📊 Зведення за типами</h2>
-    <table>
-        <thead>
-            <tr><th>Тип виробу</th><th>Позицій</th><th>Кількість</th><th>Вага, кг</th><th>Площа, м²</th><th>Вартість, грн</th></tr>
-        </thead>
-        <tbody>{by_type_rows}</tbody>
-    </table>
-
-    <h2>🔧 Зведення за матеріалами</h2>
-    <table>
-        <thead>
-            <tr><th>Матеріал</th><th>Товщина, мм</th><th>Кількість</th><th>Вага, кг</th><th>Площа, м²</th><th>Вартість, грн</th></tr>
-        </thead>
-        <tbody>{by_mat_rows}</tbody>
-    </table>
-
-    <p style="margin-top:40px; color:#999; font-size:11px;">
-        Сформовано автоматично системою VentCompany
-    </p>
-</body>
-</html>"""
-
-
-# =========================================================
-# БІЛДЕР СПЕЦИФІКАЦІЇ
-# =========================================================
+        return f"""
+        <!DOCTYPE html>
+        <html>
+        <head><meta charset="utf-8"><title>Специфікація — {html.escape(self.project_name)}</title>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 40px; }}
+            h1 {{ color: #333; }}
+            table {{ border-collapse: collapse; width: 100%; margin: 20px 0; font-size: 12px; }}
+            th, td {{ border: 1px solid #ddd; padding: 6px; text-align: left; }}
+            th {{ background-color: #4CAF50; color: white; }}
+            tr:nth-child(even) {{ background-color: #f2f2f2; }}
+            .summary {{ background-color: #e8f5e9; font-weight: bold; }}
+        </style></head>
+        <body>
+        <h1>🏭 Специфікація виробів</h1>
+        <p><strong>Проєкт:</strong> {html.escape(self.project_name)}</p>
+        <p><strong>Дата:</strong> {self.created_at}</p>
+        {f'<p><strong>ID:</strong> {self.project_id}</p>' if self.project_id else ''}
+        <p class="summary">
+            Позицій: {self.total_items} | Кількість: {self.total_quantity} шт |
+            Вага: {self.total_weight:.3f} кг | Площа: {self.total_area:.4f} м² |
+            Вартість: {self.total_price:.2f} грн
+        </p>
+        <h2>📋 Детальна специфікація</h2>
+        <table>
+        <tr><th>№</th><th>Найменування</th><th>Тип</th><th>Розміри</th><th>Матеріал</th>
+        <th>Товщ.</th><th>Од.</th><th>К-ть</th><th>Вага 1 шт</th><th>Вага заг.</th>
+        <th>Площа 1 шт</th><th>Площа заг.</th><th>Ціна 1 шт</th><th>Ціна заг.</th><th>Примітки</th></tr>
+        {rows}
+        <tr class="summary"><td colspan="7">ВСЬОГО:</td><td>{self.total_quantity}</td>
+        <td></td><td>{self.total_weight:.4f}</td><td></td><td>{self.total_area:.4f}</td>
+        <td></td><td>{self.total_price:.2f}</td><td></td></tr>
+        </table>
+        <h2>📊 Зведення за типами</h2>
+        <table><tr><th>Тип виробу</th><th>Позицій</th><th>Кількість</th>
+        <th>Вага, кг</th><th>Площа, м²</th><th>Вартість, грн</th></tr>{by_type_rows}</table>
+        <h2>🔧 Зведення за матеріалами</h2>
+        <table><tr><th>Матеріал</th><th>Товщина, мм</th><th>Кількість</th>
+        <th>Вага, кг</th><th>Площа, м²</th><th>Вартість, грн</th></tr>{by_mat_rows}</table>
+        <p style="color:#666;font-size:11px;">Сформовано автоматично системою VentCompany</p>
+        </body></html>
+        """
 
 
 class SpecBuilder:
@@ -401,15 +332,28 @@ class SpecBuilder:
 
     def __init__(self, project_name: str, project_id: str | None = None):
         self.spec = Specification(project_name=project_name, project_id=project_id)
-        self._price_per_kg: dict[str, float] = {
-            "оцинкована сталь": 55.0,
-            "нержавіюча сталь": 180.0,
-            "алюміній": 120.0,
-        }
+        self._pricing = None
+        try:
+            from ventilation_company.gui.settings_tab import PricingSettings
+
+            self._pricing = PricingSettings()
+        except ImportError:
+            pass
 
     def set_material_price(self, material: str, price_per_kg: float):
-        """Встановити ціну за кг для матеріалу."""
-        self._price_per_kg[material] = price_per_kg
+        """Зворотна сумісність — ігнорується, якщо PricingSettings активний."""
+        pass
+
+    def _calculate_price(self, product: dict) -> float:
+        """Розрахувати ціну виробу через PricingSettings або базову формулу."""
+        if self._pricing:
+            return self._pricing.calculate_product_price(product)
+
+        # Базовий розрахунок
+        weight = product.get("weight_kg", 0.0)
+        material = product.get("material", "оцинкована сталь")
+        base_prices = {"оцинкована сталь": 55.0, "нержавіюча сталь": 180.0, "алюміній": 120.0}
+        return weight * base_prices.get(material, 55.0)
 
     def add_product(self, product: dict):
         """Додати виріб у специфікацію."""
@@ -417,7 +361,7 @@ class SpecBuilder:
         ptype = product.get("type", "")
         w = product.get("width", 0)
         h = product.get("height", 0)
-        l = product.get("length", 0)
+        length = product.get("length", 0)
         material = product.get("material", "оцинкована сталь")
         thickness = product.get("thickness", 0.7)
         qty = product.get("quantity", 1)
@@ -425,11 +369,8 @@ class SpecBuilder:
         area = product.get("metal_area_m2", 0.0)
         notes = product.get("notes", "")
 
-        dimensions = f"{w}×{h}×{l}" if l else f"{w}×{h}"
-
-        # Розрахунок ціни
-        price_kg = self._price_per_kg.get(material, 55.0)
-        price_per_unit = weight * price_kg
+        dimensions = f"{w}×{h}×{length}" if length else f"{w}×{h}"
+        price_per_unit = self._calculate_price(product)
 
         item = SpecItem(
             position=0,
@@ -447,7 +388,6 @@ class SpecBuilder:
         self.spec.add_item(item)
 
     def add_products(self, products: list[dict]):
-        """Додати список виробів."""
         for p in products:
             self.add_product(p)
 
@@ -455,7 +395,6 @@ class SpecBuilder:
         return self.spec
 
     def export(self, format: str = "json") -> str:
-        """Експортувати специфікацію у вказаний формат."""
         fmt = format.lower()
         if fmt == "json":
             return self.spec.to_json()
@@ -469,26 +408,17 @@ class SpecBuilder:
             raise ValueError(f"Невідомий формат: {format}")
 
     def save_to_file(self, filepath: str, format: str = "json"):
-        """Зберегти специфікацію у файл."""
         content = self.export(format)
         with open(filepath, "w", encoding="utf-8") as f:
             f.write(content)
 
 
-# =========================================================
-# ФУНКЦІЇ ДЛЯ ІНТЕГРАЦІЇ
-# =========================================================
-
-
 def build_specification_from_library(
     library, project_name: str, project_id: str | None = None, format: str = "json"
 ) -> str:
-    """Створити специфікацію з ProductLibrary (з standard_products.py)."""
+    """Створити специфікацію з ProductLibrary."""
     builder = SpecBuilder(project_name, project_id)
-
-    # Отримуємо згруповану специфікацію з бібліотеки
     spec_data = library.get_specification()
-
     for item in spec_data:
         builder.add_product(
             {
@@ -504,15 +434,12 @@ def build_specification_from_library(
                 "metal_area_m2": item["total_area_m2"] / max(item["quantity"], 1),
             }
         )
-
     return builder.export(format)
 
 
 def merge_specifications(specs: list[Specification], new_project_name: str) -> Specification:
-    """Об'єднати кілька специфікацій в одну (для зведення)."""
+    """Об'єднати кілька специфікацій в одну."""
     merged = Specification(project_name=new_project_name)
-
-    # Групуємо всі позиції
     grouped = defaultdict(
         lambda: {
             "name": "",
@@ -528,7 +455,6 @@ def merge_specifications(specs: list[Specification], new_project_name: str) -> S
             "notes": "",
         }
     )
-
     for spec in specs:
         for item in spec.items:
             key = (item.name, item.dimensions, item.material, item.thickness)
@@ -562,5 +488,4 @@ def merge_specifications(specs: list[Specification], new_project_name: str) -> S
                 notes=data["notes"],
             )
         )
-
     return merged
