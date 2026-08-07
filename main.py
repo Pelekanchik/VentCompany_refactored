@@ -11,7 +11,7 @@ import sys
 def run_gui():
     """Функція для запуску GUI."""
     try:
-        from ventilation_company.gui import main as gui_main
+        from ventilation_company.gui.main_window import main as gui_main
 
         gui_main()
     except ImportError as e:
@@ -22,8 +22,10 @@ def run_gui():
 
 def run_cli():
     """Функція для запуску CLI."""
-    from ventilation_company.main_cli import main as cli_main
-
+    try:
+        from ventilation_company.main_cli import main as cli_main
+    except ImportError:
+        from main_cli import main as cli_main
     cli_main()
 
 
