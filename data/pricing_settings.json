@@ -1,124 +1,176 @@
 {
+  "pricing_method": "cost_plus",
+  "default_markup": 1.25,
+  "currency": "UAH",
+  "currency_symbol": "₴",
+  "price_unit": "грн/м²",
+
   "material_prices": {
     "оцинкована сталь": {
-      "0.5": 52.0,
-      "0.7": 55.0,
-      "0.9": 60.0,
-      "1.0": 65.0,
-      "1.2": 72.0,
-      "1.5": 85.0,
-      "2.0": 110.0
+      "0.5 мм": 55,
+      "0.7 мм": 55,
+      "0.9 мм": 60,
+      "1.0 мм": 65,
+      "1.2 мм": 70,
+      "1.5 мм": 80,
+      "2.0 мм": 100
     },
     "нержавіюча сталь": {
-      "0.5": 170.0,
-      "0.7": 180.0,
-      "0.9": 195.0,
-      "1.0": 210.0,
-      "1.2": 240.0,
-      "1.5": 290.0,
-      "2.0": 380.0
+      "0.5 мм": 85,
+      "0.7 мм": 85,
+      "0.9 мм": 90,
+      "1.0 мм": 95,
+      "1.2 мм": 100,
+      "1.5 мм": 110,
+      "2.0 мм": 130
     },
     "алюміній": {
-      "0.5": 110.0,
-      "0.7": 120.0,
-      "0.9": 130.0,
-      "1.0": 140.0,
-      "1.2": 160.0,
-      "1.5": 190.0,
-      "2.0": 250.0
+      "0.5 мм": 120,
+      "0.7 мм": 120,
+      "0.9 мм": 125,
+      "1.0 мм": 130,
+      "1.2 мм": 135,
+      "1.5 мм": 145,
+      "2.0 мм": 165
     }
   },
-  "overhead": {
-    "electricity_per_kg": 2.5,
-    "labor_per_hour": 150.0,
-    "rent_per_month": 15000.0,
-    "transport_per_project": 500.0,
-    "waste_percent": 8.0
+
+  "🆕 material_prices_per_m2": {
+    "_comment": "Ціни за 1 м² металу (грн/м²). Розраховано як: ціна_за_кг × товщину(м) × густину",
+    "оцинкована сталь": {
+      "0.5 мм": 215.88,
+      "0.7 мм": 302.23,
+      "0.9 мм": 388.58,
+      "1.0 мм": 431.75,
+      "1.2 мм": 518.10,
+      "1.5 мм": 647.63,
+      "2.0 мм": 863.50
+    },
+    "нержавіюча сталь": {
+      "0.5 мм": 197.50,
+      "0.7 мм": 276.50,
+      "0.9 мм": 355.50,
+      "1.0 мм": 395.00,
+      "1.2 мм": 474.00,
+      "1.5 мм": 592.50,
+      "2.0 мм": 790.00
+    },
+    "алюміній": {
+      "0.5 мм": 67.50,
+      "0.7 мм": 94.50,
+      "0.9 мм": 121.50,
+      "1.0 мм": 135.00,
+      "1.2 мм": 162.00,
+      "1.5 мм": 202.50,
+      "2.0 мм": 270.00
+    }
   },
-  "depreciation": {
-    "guillotine_percent": 5.0,
-    "bending_percent": 4.0,
-    "welding_percent": 3.0,
-    "plasma_percent": 6.0
+
+  "work_coefficients": {
+    "cutting": 1.0,
+    "bending": 1.15,
+    "welding": 1.25,
+    "flanging": 1.1,
+    "insulation": 1.3
   },
-  "products": [
+
+  "waste_percent": 15,
+
+  "delivery": {
+    "enabled": true,
+    "price_per_km": 15,
+    "min_price": 200
+  },
+
+  "formula_examples": [
     {
       "name": "Повітропровід прямокутний",
-      "formula": "metal_area * thickness * material_price * 1.15",
-      "labor_hours": 0.15,
-      "description": "Прямокутний канал — розгортка + згин"
+      "formula": "(width + height) * 2 * length / 1000000 * metal_price * 1.15",
+      "description": "Периметр × довжину → м² × ціна металу (грн/м²) × коеф. витрат 15%"
     },
     {
       "name": "Повітропровід круглий",
-      "formula": "metal_area * thickness * material_price * 1.20",
-      "labor_hours": 0.2,
-      "description": "Спірально-навивна труба"
+      "formula": "pi * diameter * length / 1000000 * metal_price * 1.15",
+      "description": "π × діаметр × довжину → м² × ціна металу × коеф. 1.15"
     },
     {
       "name": "Фланець прямокутний",
-      "formula": "metal_area * thickness * material_price * 1.30 + bolt_count * 2.5",
-      "labor_hours": 0.25,
-      "description": "Розкрій + свердління отворів"
+      "formula": "(width + 60) * (height + 60) / 1000000 * metal_price * 1.2",
+      "description": "Площа з полкою 30 мм × ціна × коеф. 1.2 (отвори під болти)"
     },
     {
       "name": "Фланець круглий",
-      "formula": "metal_area * thickness * material_price * 1.30 + bolt_count * 2.5",
-      "labor_hours": 0.25,
-      "description": "Токарка + свердління"
+      "formula": "pi * ((diameter + 60) / 2) ** 2 / 1000000 * metal_price * 1.2",
+      "description": "Площа круга з полкою 30 мм × ціна × коеф. 1.2"
     },
     {
       "name": "Трійник прямокутний",
-      "formula": "metal_area * thickness * material_price * 1.50",
-      "labor_hours": 0.8,
-      "description": "Розкрій + врізка + згин"
+      "formula": "surface_m2 * metal_price * 1.25",
+      "description": "Площа поверхні × ціна × коеф. 1.25 (складна геометрія)"
     },
     {
       "name": "Трійник круглий",
-      "formula": "metal_area * thickness * material_price * 1.55",
-      "labor_hours": 0.9,
-      "description": "Врізка в трубу + зварка"
+      "formula": "pi * diameter * length / 1000000 * metal_price * 1.25",
+      "description": "π × діаметр × довжину → м² × ціна × коеф. 1.25"
     },
     {
       "name": "Перехід прямокутний",
-      "formula": "metal_area * thickness * material_price * 1.40",
-      "labor_hours": 0.6,
-      "description": "Трапецієподібна розгортка"
+      "formula": "surface_m2 * metal_price * 1.2",
+      "description": "Площа поверхні × ціна × коеф. 1.2"
     },
     {
       "name": "Перехід круглий",
-      "formula": "metal_area * thickness * material_price * 1.45",
-      "labor_hours": 0.7,
-      "description": "Конусна розгортка"
+      "formula": "pi * ((diameter + end_diameter) / 2) * length / 1000000 * metal_price * 1.2",
+      "description": "Середній діаметр × довжину → м² × ціна × коеф. 1.2"
     },
     {
       "name": "Відвід прямокутний",
-      "formula": "metal_area * thickness * material_price * 1.60",
-      "labor_hours": 1.0,
-      "description": "Сегментне коліно"
+      "formula": "perimeter_mm * length / 1000000 * metal_price * 1.25",
+      "description": "Периметр × довжину дуги × ціна × коеф. 1.25 (гнуття)"
     },
     {
       "name": "Відвід круглий",
-      "formula": "metal_area * thickness * material_price * 1.65",
-      "labor_hours": 1.1,
-      "description": "Гнуте коліно"
+      "formula": "pi * diameter * length / 1000000 * metal_price * 1.25",
+      "description": "π × діаметр × довжину дуги → м² × ціна × коеф. 1.25"
     },
     {
       "name": "Заглушка прямокутна",
-      "formula": "metal_area * thickness * material_price * 1.25",
-      "labor_hours": 0.2,
-      "description": "Дно + фальци"
+      "formula": "(width * height + 2 * (width + height) * 25) / 1000000 * metal_price * 1.1",
+      "description": "Дно + боки (глибина 25 мм) × ціна × коеф. 1.1"
     },
     {
       "name": "Заглушка кругла",
-      "formula": "metal_area * thickness * material_price * 1.25",
-      "labor_hours": 0.2,
-      "description": "Витиск + фальци"
+      "formula": "(pi * (diameter / 2) ** 2 + pi * diameter * 30) / 1000000 * metal_price * 1.1",
+      "description": "Дно + бік (глибина 30 мм) × ціна × коеф. 1.1"
     },
     {
-      "name": "Гнучка вставка",
-      "formula": "metal_area * 35.0 + 25.0",
-      "labor_hours": 0.1,
-      "description": "Тканина + обжим"
+      "name": "Проста площа × ціна",
+      "formula": "surface_m2 * metal_price",
+      "description": "Базова формула: площа поверхні (м²) × ціна металу (грн/м²)"
+    },
+    {
+      "name": "Площа × ціна × коеф. витрат",
+      "formula": "surface_m2 * metal_price * 1.15",
+      "description": "Площа × ціна × 1.15 (15% на відходи при розкрої)"
+    },
+    {
+      "name": "Вага × ціна за кг (стара система)",
+      "formula": "weight_kg * (metal_price / (thickness / 1000 * 7850))",
+      "description": "УВАГА: тут metal_price має бути ціною за КГ, не за м²! Використовуйте surface_m2 * metal_price замість цього."
     }
-  ]
+  ],
+
+  "variable_help": {
+    "length": {"label": "Довжина (L)", "unit": "мм", "example": 1000},
+    "width": {"label": "Ширина (W)", "unit": "мм", "example": 400},
+    "height": {"label": "Висота (H)", "unit": "мм", "example": 200},
+    "diameter": {"label": "Діаметр (Ø)", "unit": "мм", "example": 125},
+    "thickness": {"label": "Товщина (T)", "unit": "мм", "example": 0.7},
+    "quantity": {"label": "Кількість (Q)", "unit": "шт", "example": 5},
+    "metal_price": {"label": "Ціна металу", "unit": "грн/м²", "example": 302.23},
+    "perimeter_mm": {"label": "Периметр", "unit": "мм", "example": 1200},
+    "surface_m2": {"label": "Площа поверхні", "unit": "м²", "example": 1.2},
+    "volume_m3": {"label": "Об'єм металу", "unit": "м³", "example": 0.00084},
+    "weight_kg": {"label": "Вага", "unit": "кг", "example": 6.59}
+  }
 }

@@ -1755,11 +1755,10 @@ class PriceListTab:
         if export_to_excel(products, grand, filepath):
             self.status.config(text=f" 📊 Експортовано: {filepath}")
             msg = "Файл збережено:\n" + filepath + "\n\nВідкрити папку?"
-            if messagebox.askyesno("Готово", msg):
-                open_folder_crossplatform(EXPORT_DIR)
+        if messagebox.askyesno("Готово", msg):
+            open_folder_crossplatform(EXPORT_DIR)
         else:
             messagebox.showerror("Помилка", "Не вдалося зберегти файл Excel.")
-            open_folder_crossplatform(EXPORT_DIR)
 
     def _import(self):
         dlg = ImportDialog(self.root)

@@ -2,7 +2,7 @@
 
 import tkinter as tk
 from collections.abc import Callable
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from ventilation_company.freecad_models import FREECAD_AVAILABLE, export_products_to_freecad
 from ventilation_company.standard_products import (
@@ -249,6 +249,7 @@ class ProductsTab:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.tree.bind("<Button-3>", self._on_tree_right_click)
+        self.tree.bind("<Double-1>", self._on_tree_double_click)
 
         btn_frame = ttk.Frame(right_frame)
         btn_frame.pack(fill=tk.X, pady=5)
@@ -263,22 +264,111 @@ class ProductsTab:
                 btn_frame, text="🏗️ Експорт у FreeCAD", command=self._export_selected_freecad
             ).pack(side=tk.RIGHT, padx=2)
 
-        self.summary_label = ttk.Label(
-            right_frame, text="Всього: 0 виробів | 0.000 м² | 0.000 кг", font=("Arial", 10, "bold")
+        # === ВЕРТИКАЛЬНІ ПІДСУМКИ ===
+        self.summary_frame = ttk.LabelFrame(right_frame, text="📊 Підсумки", padding=5)
+        self.summary_frame.pack(fill=tk.X, pady=5)
+
+        self.summary_count_label = ttk.Label(
+            self.summary_frame, text="Виробів: 0", font=("Arial", 10, "bold")
         )
-        self.summary_label.pack(pady=5)
+        self.summary_count_label.pack(anchor="w")
+
+        self.summary_area_label = ttk.Label(
+            self.summary_frame, text="Площа: 0.000 м²", font=("Arial", 10, "bold")
+        )
+        self.summary_area_label.pack(anchor="w")
+
+        self.summary_weight_label = ttk.Label(
+            self.summary_frame, text="Вага: 0.000 кг", font=("Arial", 10, "bold")
+        )
+        self.summary_weight_label.pack(anchor="w")
 
     def _on_tree_right_click(self, event):
         item = self.tree.identify_row(event.y)
         if item:
             self.tree.selection_set(item)
             menu = tk.Menu(self.frame, tearoff=0)
+            menu.add_command(label="✏️ Змінити площу металу", command=self._edit_metal_area)
+            menu.add_separator()
+            menu.add_command(label="↩️ Скинути на авто-формулу", command=self._reset_metal_area)
+            menu.add_separator()
             menu.add_command(label="Видалити", command=self._remove_selected)
             if FREECAD_AVAILABLE:
                 menu.add_separator()
                 menu.add_command(label="🏗️ Експорт .FCStd", command=self._export_selected_freecad)
                 menu.add_command(label="📐 Експорт .STEP", command=self._export_selected_step)
             menu.post(event.x_root, event.y_root)
+
+    def _on_tree_double_click(self, event):
+        """Подвійний клік — редагування площі металу."""
+        item = self.tree.identify_row(event.y)
+        if item:
+            self.tree.selection_set(item)
+            self._edit_metal_area()
+
+    def _edit_metal_area(self):
+        """Діалог зміни площі металу для вибраного виробу."""
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Увага", "Оберіть виріб для редагування.")
+            return
+        idx = self.tree.index(selected[0])
+        if idx < 0 or idx >= len(self.library.products):
+            return
+        product = self.library.products[idx]
+
+        new_area = simpledialog.askfloat(
+            "Редагування площі металу",
+            f"Виріб: {product.name}\n\n"
+            f"Поточна площа: {product.metal_area:.4f} м²\n"
+            f"Авто-формула: {product.calculate_metal_area():.4f} м²\n\n"
+            "Введіть нову площу (м²):",
+            initialvalue=round(product.metal_area, 4),
+            minvalue=0.0,
+        )
+        if new_area is None:
+            return
+
+        # Застосовуємо ручну площу та перераховуємо вагу
+        product.metal_area = new_area
+        product.use_custom_area = True
+        product.weight = product.calculate_weight()
+
+        self._refresh_tree()
+        self._update_summary()
+        if self.on_products_changed:
+            self.on_products_changed()
+
+        messagebox.showinfo(
+            "Успіх",
+            f"Площу металу оновлено:\n"
+            f"{product.name}\n"
+            f"Нова площа: {new_area:.4f} м²\n"
+            f"Нова вага: {product.weight:.3f} кг",
+        )
+
+    def _reset_metal_area(self):
+        """Скинути площу металу на автоматичний розрахунок."""
+        selected = self.tree.selection()
+        if not selected:
+            messagebox.showwarning("Увага", "Оберіть виріб для скидання.")
+            return
+        idx = self.tree.index(selected[0])
+        if idx < 0 or idx >= len(self.library.products):
+            return
+        product = self.library.products[idx]
+        product.reset_to_auto()
+        self._refresh_tree()
+        self._update_summary()
+        if self.on_products_changed:
+            self.on_products_changed()
+        messagebox.showinfo(
+            "Успіх",
+            f"Площу скинуто на автоматичний розрахунок:\n"
+            f"{product.name}\n"
+            f"Нова площа: {product.metal_area:.4f} м²\n"
+            f"Нова вага: {product.weight:.3f} кг",
+        )
 
     def _export_selected_freecad(self):
         selected = self.tree.selection()
@@ -608,7 +698,9 @@ class ProductsTab:
         total = len(self.library)
         area = self.library.get_total_metal_area()
         weight = self.library.get_total_weight()
-        self.summary_label.config(text=f"Всього: {total} виробів | {area:.3f} м² | {weight:.3f} кг")
+        self.summary_count_label.config(text=f"Виробів: {total}")
+        self.summary_area_label.config(text=f"Площа: {area:.3f} м²")
+        self.summary_weight_label.config(text=f"Вага: {weight:.3f} кг")
 
     def _remove_selected(self):
         selected = self.tree.selection()

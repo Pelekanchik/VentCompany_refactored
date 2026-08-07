@@ -47,11 +47,13 @@ class StandardProduct:
     notes: str = ""
 
     # Автоматично розраховується
-    metal_area: float = field(init=False)  # м² розгорнутої площі
-    weight: float = field(init=False)  # кг
+    metal_area: float = 0.0  # м² розгорнутої площі
+    weight: float = 0.0  # кг
+    use_custom_area: bool = False  # чи використовується ручна площа
 
     def __post_init__(self):
-        self.metal_area = self.calculate_metal_area()
+        if not self.use_custom_area or self.metal_area == 0:
+            self.metal_area = self.calculate_metal_area()
         self.weight = self.calculate_weight()
 
     def calculate_metal_area(self) -> float:
@@ -62,6 +64,18 @@ class StandardProduct:
         """Розрахунок ваги виробу (кг)."""
         volume = self.metal_area * (self.thickness.value / 1000)  # м³
         return volume * DENSITY[self.material]
+
+    def recalculate(self):
+        """Перерахувати площу та вагу (якщо не встановлено ручну площу)."""
+        if not self.use_custom_area:
+            self.metal_area = self.calculate_metal_area()
+        self.weight = self.calculate_weight()
+
+    def reset_to_auto(self):
+        """Скинути на автоматичний розрахунок."""
+        self.use_custom_area = False
+        self.metal_area = self.calculate_metal_area()
+        self.weight = self.calculate_weight()
 
     def to_dict(self) -> dict:
         return {
@@ -75,6 +89,7 @@ class StandardProduct:
             "quantity": self.quantity,
             "metal_area_m2": round(self.metal_area, 4),
             "weight_kg": round(self.weight, 4),
+            "use_custom_area": self.use_custom_area,
             "notes": self.notes,
         }
 
